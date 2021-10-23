@@ -114,7 +114,7 @@ def plotRegret(labels, mean_regret, colors, title, log=False):
     plt.ylabel("Cumulative regret")
     plt.xlabel("Time period")
     plt.legend()
-    plt.show()
+    plt.savefig("./storage/regret.pdf")
 
 
 def storeRegret(models, methods, param_dic, n_expe, T):

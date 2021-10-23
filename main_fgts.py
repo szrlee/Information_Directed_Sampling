@@ -48,10 +48,10 @@ FGTSLinMAB = True
 # Regret
 labels, colors = utils.labelColor(linear_methods)
 lin = exp.LinMAB_expe(
-    n_expe=1,
+    n_expe=50,
     n_features=100,
     n_arms=2,
-    T=10,
+    T=1000,
     methods=linear_methods,
     param_dic=param,
     labels=labels,

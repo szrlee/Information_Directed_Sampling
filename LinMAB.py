@@ -1,7 +1,13 @@
 """ Packages import """
 import numpy as np
+
+# import jax.numpy as np
 from utils import rd_argmax
 from scipy.stats import norm
+
+import jax.numpy as jnp
+import jax.random as random
+from sgmcmcjax.samplers import build_sgld_sampler
 
 
 class ArmGaussianLinear(object):
@@ -14,7 +20,9 @@ class ArmGaussianLinear(object):
         :param arm: int
         :return: float
         """
-        return np.dot(self.features[arm], self.real_theta) + self.local_random.normal(0, self.eta, 1)
+        return np.dot(self.features[arm], self.real_theta) + self.local_random.normal(
+            0, self.eta, 1
+        )
 
     @property
     def n_features(self):
@@ -38,8 +46,9 @@ class ArmGaussianLinear(object):
 class PaperLinModel(ArmGaussianLinear):
     def __init__(self, u, n_features, n_actions, eta=1, sigma=10):
         """
-        Initialization of the arms, features and theta
-        :param u: float, features are drawn from a uniform U(-a, a)
+        Initialization of the arms, features and theta in
+        Russo, Daniel, and Benjamin Van Roy. "Learning to optimize via information-directed sampling." Operations Research 66.1 (2018): 230-252.
+        :param u: float, features are drawn from a uniform Unif(-u, u)
         :param n_features: int, dimension of the feature vectors
         :param n_actions: int, number of actions
         :param eta: float, std from the reward N(a^T.theta, eta)
@@ -49,23 +58,63 @@ class PaperLinModel(ArmGaussianLinear):
         super(PaperLinModel, self).__init__(random_state=np.random.randint(1, 312414))
         self.eta = eta
         self.features = self.local_random.uniform(-u, u, (n_actions, n_features))
-        self.real_theta = self.local_random.multivariate_normal(np.zeros(n_features), sigma*np.eye(n_features))
+        self.real_theta = self.local_random.multivariate_normal(
+            np.zeros(n_features), sigma * np.eye(n_features)
+        )
+
+
+class FGTSLinModel(ArmGaussianLinear):
+    def __init__(self, n_features=100, n_actions=2, eta=np.sqrt(0.5)):
+        """
+        Initialization of the arms, features and theta in
+        Zhang, Tong. "Feel-Good Thompson Sampling for Contextual Bandits and Reinforcement Learning." arXiv preprint arXiv:2110.00871 (2021).
+        :param n_features: int, dimension of the feature vectors
+        :param n_actions: int, number of actions
+        """
+        super(FGTSLinModel, self).__init__(random_state=np.random.randint(1, 312414))
+        self.eta = eta
+        self.features = np.zeros((n_actions, n_features))
+        self.features[0, 0] = 1.0
+        self.features[1, 1] = np.sqrt(0.2)
+        # print(self.features)
+        self.real_theta = np.zeros(n_features)
+        self.real_theta[0:2] = 1.0
+
+    def reward(self, arm):
+        """
+        Pull 'arm' and get the reward drawn from a^T . theta + epsilon with epsilon following Unif(-0.5, 0.5)
+        :param arm: int
+        :return: float
+        """
+        return np.dot(self.features[arm], self.real_theta) + self.local_random.uniform(
+            -0.5, 0.5, 1
+        )
+
 
 class ColdStartMovieLensModel(ArmGaussianLinear):
     def __init__(self, n_features=30, n_actions=207, eta=1, sigma=10):
-        super(ColdStartMovieLensModel, self).__init__(random_state=np.random.randint(1, 312414))
+        super(ColdStartMovieLensModel, self).__init__(
+            random_state=np.random.randint(1, 312414)
+        )
         self.eta = eta
-        self.features = np.loadtxt('Data/Vt.csv', delimiter=',').T
-        self.real_theta = self.local_random.multivariate_normal(np.zeros(n_features), sigma*np.eye(n_features))
+        self.features = np.loadtxt("Data/Vt.csv", delimiter=",").T
+        self.real_theta = self.local_random.multivariate_normal(
+            np.zeros(n_features), sigma * np.eye(n_features)
+        )
 
 
-class LinMAB():
+class LinMAB:
     def __init__(self, model):
         """
         :param model: ArmGaussianLinear object
         """
         self.model = model
-        self.regret, self.n_a, self.d, self.features = model.regret, model.n_actions, model.n_features, model.features
+        self.regret, self.n_a, self.d, self.features = (
+            model.regret,
+            model.n_actions,
+            model.n_features,
+            model.features,
+        )
         self.reward, self.eta = model.reward, model.eta
         self.flag = False
         self.optimal_arm = None
@@ -74,7 +123,9 @@ class LinMAB():
 
     def initPrior(self, a0=1, s0=10):
         mu_0 = a0 * np.ones(self.d)
-        sigma_0 = s0 * np.eye(self.d)  # to adapt according to the true distribution of theta
+        sigma_0 = s0 * np.eye(
+            self.d
+        )  # to adapt according to the true distribution of theta
         return mu_0, sigma_0
 
     def TS(self, T):
@@ -92,6 +143,50 @@ class LinMAB():
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
+    def FGTS(self, T):
+        """
+        Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        # define model in JAX
+        def loglikelihood(theta, x, y):
+            return -((jnp.dot(x, theta) - y) ** 2)
+
+        def logprior(theta):
+            return -0.5 * jnp.dot(theta, theta) * 100
+        # generate random key in jax
+        key = random.PRNGKey(0)
+
+        dt = 1e-2
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+
+        for t in range(T):
+            # build sampler
+            # batch_size = int(0.1*N)
+            if t == 0:
+                mu_t, sigma_t = self.initPrior(a0=0, s0=0.1)
+                theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
+            else:
+                # if t<=10:
+                #     batch_size = 1
+                # else:
+                #     batch_size = 10
+                X = jnp.asarray(self.features[arm_sequence[:t]])
+                # y = np.expand_dims(reward[:t], axis=1)
+                y = jnp.asarray(reward[:t])
+                # print(X.shape, y.shape)
+                my_sampler = build_sgld_sampler(
+                    dt, loglikelihood, logprior, (X, y), 10, pbar=False
+                )
+                # run sampler
+                theta_t = my_sampler(key, 1, jnp.zeros(self.d)).T
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            reward[t], arm_sequence[t] = r_t, a_t
+        return reward, arm_sequence
+
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """
         Implementation of Linear UCB algorithm for Linear Bandits with multivariate normal prior
@@ -101,14 +196,20 @@ class LinMAB():
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
         arm_sequence, reward = np.zeros(T), np.zeros(T)
-        a_t, A_t, b_t = np.random.randint(0, self.n_a - 1, 1)[0], lbda * np.eye(self.d), np.zeros(self.d)
+        a_t, A_t, b_t = (
+            np.random.randint(0, self.n_a - 1, 1)[0],
+            lbda * np.eye(self.d),
+            np.zeros(self.d),
+        )
         r_t = self.reward(a_t)
         for t in range(T):
             A_t += np.outer(self.features[a_t, :], self.features[a_t, :])
             b_t += r_t * self.features[a_t, :]
             inv_A = np.linalg.inv(A_t)
             theta_t = np.dot(inv_A, b_t)
-            beta_t = alpha * np.sqrt(np.diagonal(np.dot(np.dot(self.features, inv_A), self.features.T)))
+            beta_t = alpha * np.sqrt(
+                np.diagonal(np.dot(np.dot(self.features, inv_A), self.features.T))
+            )
             a_t = rd_argmax(np.dot(self.features, theta_t) + beta_t)
             r_t = self.reward(a_t)
             arm_sequence[t], reward[t] = a_t, r_t
@@ -124,8 +225,13 @@ class LinMAB():
         arm_sequence, reward = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
-            a_t = rd_argmax(np.dot(self.features, mu_t) + norm.ppf(t/(t+1)) *
-                            np.sqrt(np.diagonal(np.dot(np.dot(self.features, sigma_t), self.features.T))))
+            a_t = rd_argmax(
+                np.dot(self.features, mu_t)
+                + norm.ppf(t / (t + 1))
+                * np.sqrt(
+                    np.diagonal(np.dot(np.dot(self.features, sigma_t), self.features.T))
+                )
+            )
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
@@ -140,9 +246,16 @@ class LinMAB():
         arm_sequence, reward = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
-            beta_t = 2 * np.log(self.n_a * ((t+1)*np.pi)**2 / 6 / 0.1)
-            a_t = rd_argmax(np.dot(self.features, mu_t) +
-                            np.sqrt(beta_t * np.diagonal(np.dot(np.dot(self.features, sigma_t), self.features.T))))
+            beta_t = 2 * np.log(self.n_a * ((t + 1) * np.pi) ** 2 / 6 / 0.1)
+            a_t = rd_argmax(
+                np.dot(self.features, mu_t)
+                + np.sqrt(
+                    beta_t
+                    * np.diagonal(
+                        np.dot(np.dot(self.features, sigma_t), self.features.T)
+                    )
+                )
+            )
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
@@ -158,9 +271,16 @@ class LinMAB():
         arm_sequence, reward = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
-            beta_t = c * np.log(t+1)
-            a_t = rd_argmax(np.dot(self.features, mu_t) +
-                            np.sqrt(beta_t*np.diagonal(np.dot(np.dot(self.features, sigma_t), self.features.T))))
+            beta_t = c * np.log(t + 1)
+            a_t = rd_argmax(
+                np.dot(self.features, mu_t)
+                + np.sqrt(
+                    beta_t
+                    * np.diagonal(
+                        np.dot(np.dot(self.features, sigma_t), self.features.T)
+                    )
+                )
+            )
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
@@ -176,8 +296,11 @@ class LinMAB():
         f, r = self.features[a], self.reward(a)[0]
         s_inv = np.linalg.inv(sigma)
         ffT = np.outer(f, f)
-        mu_ = np.dot(np.linalg.inv(s_inv + ffT / self.eta**2), np.dot(s_inv, mu) + r * f / self.eta**2)
-        sigma_ = np.linalg.inv(s_inv + ffT/self.eta**2)
+        mu_ = np.dot(
+            np.linalg.inv(s_inv + ffT / self.eta ** 2),
+            np.dot(s_inv, mu) + r * f / self.eta ** 2,
+        )
+        sigma_ = np.linalg.inv(s_inv + ffT / self.eta ** 2)
         return r, mu_, sigma_
 
     def computeVIDS(self, mu_t, sigma_t, M):
@@ -193,19 +316,49 @@ class LinMAB():
         thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
         mu = np.mean(thetas, axis=0)
         theta_hat = np.argmax(np.dot(self.features, thetas.T), axis=0)
-        theta_hat_ = [thetas[np.where(theta_hat==a)] for a in range(self.n_a)]
-        p_a = np.array([len(theta_hat_[a]) for a in range(self.n_a)])/M
+        theta_hat_ = [thetas[np.where(theta_hat == a)] for a in range(self.n_a)]
+        p_a = np.array([len(theta_hat_[a]) for a in range(self.n_a)]) / M
         if np.max(p_a) >= self.threshold:
             # Stop learning policy
             self.optimal_arm = np.argmax(p_a)
             arm = self.optimal_arm
         else:
-            mu_a = np.nan_to_num(np.array([np.mean([theta_hat_[a]], axis=1).squeeze() for a in range(self.n_a)]))
-            L_hat = np.sum(np.array([p_a[a]*np.outer(mu_a[a]-mu, mu_a[a]-mu) for a in range(self.n_a)]), axis=0)
-            rho_star = np.sum(np.array([p_a[a]*np.dot(self.features[a], mu_a[a]) for a in range(self.n_a)]), axis=0)
-            v = np.array([np.dot(np.dot(self.features[a], L_hat), self.features[a].T) for a in range(self.n_a)])
-            delta = np.array([rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)])
-            arm = rd_argmax(-delta**2/v)
+            mu_a = np.nan_to_num(
+                np.array(
+                    [
+                        np.mean([theta_hat_[a]], axis=1).squeeze()
+                        for a in range(self.n_a)
+                    ]
+                )
+            )
+            L_hat = np.sum(
+                np.array(
+                    [
+                        p_a[a] * np.outer(mu_a[a] - mu, mu_a[a] - mu)
+                        for a in range(self.n_a)
+                    ]
+                ),
+                axis=0,
+            )
+            rho_star = np.sum(
+                np.array(
+                    [
+                        p_a[a] * np.dot(self.features[a], mu_a[a])
+                        for a in range(self.n_a)
+                    ]
+                ),
+                axis=0,
+            )
+            v = np.array(
+                [
+                    np.dot(np.dot(self.features[a], L_hat), self.features[a].T)
+                    for a in range(self.n_a)
+                ]
+            )
+            delta = np.array(
+                [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
+            )
+            arm = rd_argmax(-(delta ** 2) / v)
         return arm, p_a
 
     def VIDS_sample(self, T, M=10000):
@@ -220,16 +373,15 @@ class LinMAB():
         reward, arm_sequence = np.zeros(T), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-           if not self.flag:
-               if np.max(p_a) >= self.threshold:
-                   # Stop learning policy
-                   self.flag = True
-                   a_t = self.optimal_arm
-               else:
-                   a_t, p_a = self.computeVIDS(mu_t, sigma_t, M)
-           else:
-               a_t = self.optimal_arm
-           r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-           reward[t], arm_sequence[t] = r_t, a_t
+            if not self.flag:
+                if np.max(p_a) >= self.threshold:
+                    # Stop learning policy
+                    self.flag = True
+                    a_t = self.optimal_arm
+                else:
+                    a_t, p_a = self.computeVIDS(mu_t, sigma_t, M)
+            else:
+                a_t = self.optimal_arm
+            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
-

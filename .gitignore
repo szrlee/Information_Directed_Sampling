@@ -2,3 +2,5 @@
 *.d
 *.xml
 .idea/
+__pycache__/
+*.pkl

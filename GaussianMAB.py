@@ -7,13 +7,14 @@ class GaussianMAB(GenericMAB):
     """
     Gaussian Bandit Problem
     """
+
     def __init__(self, p):
         """
         Initialization
         :param p: np.array, true values of (mu, sigma) for each arm with mean sampled from N(mu, sigma)
         """
         # Initialization of arms from GenericMAB
-        super().__init__(methods=['G']*len(p), p=p)
+        super().__init__(methods=["G"] * len(p), p=p)
         # Parameters used for stop learning policy
         self.flag = False
         self.optimal_arm = None
@@ -40,7 +41,9 @@ class GaussianMAB(GenericMAB):
         :return: np.arrays, updated means and stds
         """
         eta = self.MAB[arm].eta
-        mu[arm] = (eta ** 2 * mu[arm] + r * sigma[arm] ** 2) / (eta ** 2 + sigma[arm] ** 2)
+        mu[arm] = (eta ** 2 * mu[arm] + r * sigma[arm] ** 2) / (
+            eta ** 2 + sigma[arm] ** 2
+        )
         sigma[arm] = np.sqrt((eta * sigma[arm]) ** 2 / (eta ** 2 + sigma[arm] ** 2))
         return mu, sigma
 
@@ -56,7 +59,12 @@ class GaussianMAB(GenericMAB):
             if t < self.nb_arms:
                 arm = t
             else:
-                theta = np.array([np.random.normal(mu[arm], sigma[arm]) for arm in range(self.nb_arms)])
+                theta = np.array(
+                    [
+                        np.random.normal(mu[arm], sigma[arm])
+                        for arm in range(self.nb_arms)
+                    ]
+                )
                 arm = rd_argmax(theta)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
@@ -75,11 +83,10 @@ class GaussianMAB(GenericMAB):
             if t < self.nb_arms:
                 arm = t
             else:
-                arm = rd_argmax(mu + sigma * norm.ppf(t/(t+1)))
+                arm = rd_argmax(mu + sigma * norm.ppf(t / (t + 1)))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
         return reward, arm_sequence
-
 
     def GPUCB(self, T):
         """
@@ -91,8 +98,8 @@ class GaussianMAB(GenericMAB):
         Sa, Na, reward, arm_sequence = self.init_lists(T)
         mu, sigma = self.init_prior()
         for t in range(T):
-            beta = 2 * np.log(self.nb_arms * ((t+1) * np.pi) ** 2 / 6 / 0.1)
-            arm = rd_argmax(mu + sigma*np.sqrt(beta))
+            beta = 2 * np.log(self.nb_arms * ((t + 1) * np.pi) ** 2 / 6 / 0.1)
+            arm = rd_argmax(mu + sigma * np.sqrt(beta))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
         return reward, arm_sequence
@@ -108,7 +115,7 @@ class GaussianMAB(GenericMAB):
         Sa, Na, reward, arm_sequence = self.init_lists(T)
         mu, sigma = self.init_prior()
         for t in range(T):
-            arm = rd_argmax(mu + sigma*np.sqrt(c*np.log(t+1)))
+            arm = rd_argmax(mu + sigma * np.sqrt(c * np.log(t + 1)))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
         return reward, arm_sequence
@@ -134,13 +141,19 @@ class GaussianMAB(GenericMAB):
         eta = np.array([self.MAB[arm].eta for arm in range(self.nb_arms)])
         for t in range(T):
             delta_t = np.array(
-                [mu[arm] - np.max(list(mu)[:arm] + list(mu)[arm+1:]) for arm in range(self.nb_arms)])
-            sigma_next = np.sqrt(((sigma*eta)**2)/(sigma**2+eta**2))
-            s_t = np.sqrt(sigma**2-sigma_next**2)
+                [
+                    mu[arm] - np.max(list(mu)[:arm] + list(mu)[arm + 1 :])
+                    for arm in range(self.nb_arms)
+                ]
+            )
+            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma ** 2 + eta ** 2))
+            s_t = np.sqrt(sigma ** 2 - sigma_next ** 2)
             v = s_t * self.kgf(-np.absolute(delta_t / (s_t + 10e-9)))
             arm = rd_argmax(mu + (T - t) * v)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-            mu[arm] = (eta[arm] ** 2 * mu[arm] + reward[t] * sigma[arm] ** 2) / (eta[arm] ** 2 + sigma[arm] ** 2)
+            mu[arm] = (eta[arm] ** 2 * mu[arm] + reward[t] * sigma[arm] ** 2) / (
+                eta[arm] ** 2 + sigma[arm] ** 2
+            )
             sigma[arm] = sigma_next[arm]
         return reward, arm_sequence
 
@@ -156,7 +169,11 @@ class GaussianMAB(GenericMAB):
         eta = np.array([self.MAB[arm].eta for arm in range(self.nb_arms)])
         for t in range(T):
             delta_t = np.array(
-                [mu[i] - np.max(list(mu)[:i] + list(mu)[i + 1:]) for i in range(self.nb_arms)])
+                [
+                    mu[i] - np.max(list(mu)[:i] + list(mu)[i + 1 :])
+                    for i in range(self.nb_arms)
+                ]
+            )
             r = (delta_t / sigma) ** 2
             m_lower = eta / (4 * sigma ** 2) * (-1 + r + np.sqrt(1 + 6 * r + r ** 2))
             m_higher = eta / (4 * sigma ** 2) * (1 + r + np.sqrt(1 + 10 * r + r ** 2))
@@ -167,13 +184,17 @@ class GaussianMAB(GenericMAB):
                 elif (delta_t[arm] == 0) or (m_higher[arm] <= 1):
                     m_star[arm] = 1
                 else:
-                    m_star[arm] = np.ceil(0.5 * ((m_lower + m_higher)[arm])).astype(int)  # approximation
+                    m_star[arm] = np.ceil(0.5 * ((m_lower + m_higher)[arm])).astype(
+                        int
+                    )  # approximation
             s_m = np.sqrt((m_star + 1) * sigma ** 2 / ((eta / sigma) ** 2 + m_star + 1))
             v_m = s_m * self.kgf(-np.absolute(delta_t / (s_m + 10e-9)))
-            arm = rd_argmax(mu - np.max(mu) + (T-t)*v_m)
+            arm = rd_argmax(mu - np.max(mu) + (T - t) * v_m)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma ** 2 + eta ** 2))
-            mu[arm] = (eta[arm] ** 2 * mu[arm] + reward[t] * sigma[arm] ** 2) / (eta[arm] ** 2 + sigma[arm] ** 2)
+            mu[arm] = (eta[arm] ** 2 * mu[arm] + reward[t] * sigma[arm] ** 2) / (
+                eta[arm] ** 2 + sigma[arm] ** 2
+            )
             sigma[arm] = sigma_next[arm]
         return reward, arm_sequence
 
@@ -200,20 +221,23 @@ class GaussianMAB(GenericMAB):
                         prod_F1[a, ap] *= F[app]
                 prod_F1[a, ap] *= f[a] / N
         for a in range(self.nb_arms):
-            p_star[a] = (prod_F1[a, a]).sum() * (np.max(X)-np.min(X))
+            p_star[a] = (prod_F1[a, a]).sum() * (np.max(X) - np.min(X))
             for ap in range(self.nb_arms):
                 if a != ap:
-                    maap[ap, a] = mu[ap] - sigma[ap]**2 * (prod_F1[a, ap] * f[ap]).sum() / p_star[a]
+                    maap[ap, a] = (
+                        mu[ap]
+                        - sigma[ap] ** 2 * (prod_F1[a, ap] * f[ap]).sum() / p_star[a]
+                    )
                 else:
                     maap[a, a] = (prod_F1[a, a] * X).sum() / p_star[a]
         rho_star = np.inner(np.diag(maap), p_star)
         delta = rho_star - mu
         v = np.zeros(self.nb_arms)
         for arm in range(self.nb_arms):
-            v[arm] = np.inner(p_star, (maap[arm]-mu[arm])**2)
+            v[arm] = np.inner(p_star, (maap[arm] - mu[arm]) ** 2)
         return delta, v, p_star, maap
 
-    def init_approx(self, N, mu, sigma, rg=10.):
+    def init_approx(self, N, mu, sigma, rg=10.0):
         """
         Initialization of quantities of interest for VIDS_approx algorithm
         :param N: int, number of points to take in the range of X
@@ -224,8 +248,16 @@ class GaussianMAB(GenericMAB):
         """
         X = np.linspace(-rg, rg, N)
         mu0, sigma0 = mu[0], sigma[0]
-        f = np.repeat(norm.pdf(X, mu0, sigma0), self.nb_arms, axis=0).reshape((N, self.nb_arms)).T
-        F = np.repeat(norm.cdf(X, mu0, sigma0), self.nb_arms, axis=0).reshape((N, self.nb_arms)).T
+        f = (
+            np.repeat(norm.pdf(X, mu0, sigma0), self.nb_arms, axis=0)
+            .reshape((N, self.nb_arms))
+            .T
+        )
+        F = (
+            np.repeat(norm.cdf(X, mu0, sigma0), self.nb_arms, axis=0)
+            .reshape((N, self.nb_arms))
+            .T
+        )
         return X, f, F
 
     @staticmethod
@@ -244,7 +276,7 @@ class GaussianMAB(GenericMAB):
         F[arm] = norm.cdf(X, m, s)
         return f, F
 
-    def VIDS_approx(self, T, rg=10., N=10000):
+    def VIDS_approx(self, T, rg=10.0, N=10000):
         """
         Implementation of the V-IDS algorithm with approximation of integrals using a grid on [-10, 10]
         for Gaussian Bandit Problems with normal prior
@@ -266,7 +298,9 @@ class GaussianMAB(GenericMAB):
                     self.optimal_arm = np.argmax(p_star)
                     arm = self.optimal_arm
                 else:
-                    delta, v, p_star, maap = self.IR_approx(mu, sigma, X, f, F, N, p_star, maap)
+                    delta, v, p_star, maap = self.IR_approx(
+                        mu, sigma, X, f, F, N, p_star, maap
+                    )
                     arm = self.IDSAction(delta, v)
                     # arm = rd_argmax(-delta**2/v)
             else:
@@ -294,14 +328,24 @@ class GaussianMAB(GenericMAB):
                 t = thetas[ap, np.where(theta_hat == a)]
                 Maap[ap, a] = np.nan_to_num(np.mean(t))
                 if ap == a:
-                    p_a[a] = t.shape[1]/M
+                    p_a[a] = t.shape[1] / M
         if np.max(p_a) >= self.threshold:
             self.optimal_arm = np.argmax(p_a)
             arm = self.optimal_arm
         else:
             rho_star = sum([p_a[a] * Maap[a, a] for a in range(self.nb_arms)])
             delta = rho_star - mu
-            v = np.array([sum([p_a[ap] * (Maap[a, ap] - mu[a]) ** 2 for ap in range(self.nb_arms)]) for a in range(self.nb_arms)])
+            v = np.array(
+                [
+                    sum(
+                        [
+                            p_a[ap] * (Maap[a, ap] - mu[a]) ** 2
+                            for ap in range(self.nb_arms)
+                        ]
+                    )
+                    for a in range(self.nb_arms)
+                ]
+            )
             arm = self.IDSAction(delta, v)
             # arm = rd_argmax(-delta ** 2 / v)
         return arm, p_a
@@ -318,7 +362,9 @@ class GaussianMAB(GenericMAB):
         mu, sigma = self.init_prior()
         reward, arm_sequence = np.zeros(T), np.zeros(T)
         Maap, p_a = np.zeros((self.nb_arms, self.nb_arms)), np.zeros(self.nb_arms)
-        thetas = np.array([np.random.normal(mu[arm], sigma[arm], M) for arm in range(self.nb_arms)])
+        thetas = np.array(
+            [np.random.normal(mu[arm], sigma[arm], M) for arm in range(self.nb_arms)]
+        )
         for t in range(T):
             if not self.flag:
                 if np.max(p_a) >= self.threshold:
@@ -332,4 +378,7 @@ class GaussianMAB(GenericMAB):
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
             thetas[arm] = np.random.normal(mu[arm], sigma[arm], M)
-        return reward, arm_sequence,
+        return (
+            reward,
+            arm_sequence,
+        )

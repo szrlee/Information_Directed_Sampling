@@ -1,18 +1,27 @@
 """ Packages import """
 import numpy as np
+
+# import jax.numpy as np
+
 import arms
 from tqdm import tqdm
 from utils import rd_argmax
 import random
 import inspect
 
-mapping = {'B': arms.ArmBernoulli, 'beta': arms.ArmBeta, 'F': arms.ArmFinite, 'G': arms.ArmGaussian}
+mapping = {
+    "B": arms.ArmBernoulli,
+    "beta": arms.ArmBeta,
+    "F": arms.ArmFinite,
+    "G": arms.ArmGaussian,
+}
 
 
 class GenericMAB:
     """
     Generic class for arms that defines general methods
     """
+
     def __init__(self, methods, p):
         """
         Initialization of the arms
@@ -23,8 +32,7 @@ class GenericMAB:
         self.nb_arms = len(self.MAB)
         self.means = [el.mean for el in self.MAB]
         self.mu_max = np.max(self.means)
-        self.IDS_results = {'arms': [], 'policy': [],
-                            'delta': [], 'g': [], 'IR': []}
+        self.IDS_results = {"arms": [], "policy": [], "delta": [], "g": [], "IR": []}
         self.store_IDS = False
 
     @staticmethod
@@ -69,7 +77,7 @@ class GenericMAB:
             alg = self.__getattribute__(method)
             args = inspect.getfullargspec(alg)[0][2:]
             args = [T] + [param_dic[method][i] for i in args]
-            for _ in tqdm(range(N), desc='Computing ' + str(N) + ' simulations'):
+            for _ in tqdm(range(N), desc="Computing " + str(N) + " simulations"):
                 mc_regret += self.regret(alg(*args)[0], T)
         except Exception:
             raise NotImplementedError
@@ -84,7 +92,12 @@ class GenericMAB:
                  - reward: np.array, rewards
                  - arm_sequence: np.array, arm chose at each step
         """
-        Sa, Na, reward, arm_sequence = np.zeros(self.nb_arms), np.zeros(self.nb_arms), np.zeros(T), np.zeros(T)
+        Sa, Na, reward, arm_sequence = (
+            np.zeros(self.nb_arms),
+            np.zeros(self.nb_arms),
+            np.zeros(T),
+            np.zeros(T),
+        )
         return Sa, Na, reward, arm_sequence
 
     def update_lists(self, t, arm, Sa, Na, reward, arm_sequence):
@@ -159,8 +172,11 @@ class GenericMAB:
                 arm = t
             else:
                 for arm in range(self.nb_arms):
-                    S[arm] = sum([r ** 2 for r in reward[np.where(arm_sequence == arm)]]) / Na[arm] - (
-                            Sa[arm] / Na[arm]) ** 2
+                    S[arm] = (
+                        sum([r ** 2 for r in reward[np.where(arm_sequence == arm)]])
+                        / Na[arm]
+                        - (Sa[arm] / Na[arm]) ** 2
+                    )
                     m[arm] = min(0.25, S[arm] + np.sqrt(2 * np.log(t + 1) / Na[arm]))
                 arm = rd_argmax(Sa / Na + np.sqrt(np.log(t + 1) / Na * m))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
@@ -178,7 +194,9 @@ class GenericMAB:
             if t < self.nb_arms:
                 arm = t
             else:
-                root_term = np.array(list(map(lambda x: max(x, 1), T / (self.nb_arms * Na))))
+                root_term = np.array(
+                    list(map(lambda x: max(x, 1), T / (self.nb_arms * Na)))
+                )
                 arm = rd_argmax(Sa / Na + rho * np.sqrt(4 / Na * np.log(root_term)))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
         return reward, arm_sequence
@@ -198,7 +216,11 @@ class GenericMAB:
                 if g[a] < 1e-6 or g[ap] < 1e-6:
                     return rd_argmax(-g)
                 da, dap, ga, gap = delta[a], delta[ap], g[a], g[ap]
-                qaap = q[rd_argmax(-(q * da + (1 - q) * dap) ** 2 / (q * ga + (1 - q) * gap))]
+                qaap = q[
+                    rd_argmax(
+                        -((q * da + (1 - q) * dap) ** 2) / (q * ga + (1 - q) * gap)
+                    )
+                ]
                 IR[a, ap] = (qaap * (da - dap) + dap) ** 2 / (qaap * (ga - gap) + gap)
                 Q[a, ap] = qaap
         amin = rd_argmax(-IR.reshape(self.nb_arms * self.nb_arms))
@@ -206,11 +228,13 @@ class GenericMAB:
         b = np.random.binomial(1, Q[a, ap])
         arm = int(b * a + (1 - b) * ap)
         if self.store_IDS:
-            self.IDS_results['arms'].append(arm)
+            self.IDS_results["arms"].append(arm)
             policy = np.zeros(self.nb_arms)
-            policy[a], policy[ap] = Q[a, ap], (1-Q[a, ap])
-            self.IDS_results['policy'].append(policy)
-            self.IDS_results['delta'].append(delta)
-            self.IDS_results['g'].append(g)
-            self.IDS_results['IR'].append(np.inner(delta**2, policy)/np.inner(g, policy))
+            policy[a], policy[ap] = Q[a, ap], (1 - Q[a, ap])
+            self.IDS_results["policy"].append(policy)
+            self.IDS_results["delta"].append(delta)
+            self.IDS_results["g"].append(g)
+            self.IDS_results["IR"].append(
+                np.inner(delta ** 2, policy) / np.inner(g, policy)
+            )
         return arm

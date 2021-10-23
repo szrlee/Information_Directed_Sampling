@@ -1,6 +1,8 @@
 """ Packages import """
 import numpy as np
 
+# import jax.numpy as np
+
 
 class AbstractArm(object):
     def __init__(self, mean, variance, random_state):
@@ -24,9 +26,9 @@ class ArmBernoulli(AbstractArm):
         :param random_state: int, seed to make experiments reproducible
         """
         self.p = p
-        super(ArmBernoulli, self).__init__(mean=p,
-                                           variance=p * (1. - p),
-                                           random_state=random_state)
+        super(ArmBernoulli, self).__init__(
+            mean=p, variance=p * (1.0 - p), random_state=random_state
+        )
 
     def sample(self):
         """
@@ -45,9 +47,11 @@ class ArmBeta(AbstractArm):
         """
         self.a = a
         self.b = b
-        super(ArmBeta, self).__init__(mean=a/(a + b),
-                                      variance=(a * b)/((a + b) ** 2 * (a + b + 1)),
-                                      random_state=random_state)
+        super(ArmBeta, self).__init__(
+            mean=a / (a + b),
+            variance=(a * b) / ((a + b) ** 2 * (a + b + 1)),
+            random_state=random_state,
+        )
 
     def sample(self):
         """
@@ -66,9 +70,9 @@ class ArmGaussian(AbstractArm):
         """
         self.mu = mu
         self.eta = eta
-        super(ArmGaussian, self).__init__(mean=mu,
-                                          variance=eta**2,
-                                          random_state=random_state)
+        super(ArmGaussian, self).__init__(
+            mean=mu, variance=eta ** 2, random_state=random_state
+        )
 
     def sample(self):
         """
@@ -88,9 +92,11 @@ class ArmFinite(AbstractArm):
         self.X = X
         self.P = P
         mean = np.sum(X * P)
-        super(ArmFinite, self).__init__(mean=mean,
-                                        variance=np.sum(X ** 2 * P) - mean ** 2,
-                                        random_state=random_state)
+        super(ArmFinite, self).__init__(
+            mean=mean,
+            variance=np.sum(X ** 2 * P) - mean ** 2,
+            random_state=random_state,
+        )
 
     def sample(self):
         """

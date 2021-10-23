@@ -14,7 +14,7 @@ class FiniteSets(GenericMAB):
         :param R: np.array, mapping between outcomes and rewards
         """
         super().__init__(method, param)
-        self.means = [(R*p[1]).sum() for p in param]
+        self.means = [(R * p[1]).sum() for p in param]
         self.mu_max = max(self.means)
         self.q_theta = q_theta
         self.prior = prior
@@ -88,7 +88,7 @@ class FiniteSets(GenericMAB):
         """
         R = np.zeros(self.nb_arms)
         for a in range(self.nb_arms):
-                R[a] += PY[a, :] @ self.R
+            R[a] += PY[a, :] @ self.R
         return R
 
     def get_g(self, joint, pa, py):
@@ -103,7 +103,9 @@ class FiniteSets(GenericMAB):
             for a_star in range(self.nb_arms):
                 if pa[a_star] > 0.00001:
                     for y in range(self.N):
-                        g[a] += joint[a, a_star, y] * np.log(joint[a, a_star, y] / (pa[a_star] * py[a, y]))
+                        g[a] += joint[a, a_star, y] * np.log(
+                            joint[a, a_star, y] / (pa[a_star] * py[a, y])
+                        )
         return g
 
     def IR(self):
@@ -127,7 +129,7 @@ class FiniteSets(GenericMAB):
         """
         for theta in range(self.L):
             self.prior[theta] *= self.q_theta[theta, a, y]
-        self.prior = self.prior/self.prior.sum()
+        self.prior = self.prior / self.prior.sum()
 
     def IDS(self, T):
         """

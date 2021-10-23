@@ -4,19 +4,27 @@ import utils
 from scipy.stats import beta
 from copy import copy
 
+
 class BetaBernoulliMAB(GenericMAB):
     """
     Bernoulli Bandit Problem
     """
+
     def __init__(self, p):
         """
         Initialization
         :param p: np.array, true probabilities of success for each arm
         """
         # Initialization of arms from GenericMAB
-        super().__init__(methods=['B']*len(p), p=p)
+        super().__init__(methods=["B"] * len(p), p=p)
         # Complexity
-        self.Cp = sum([(self.mu_max-x)/self.kl(x, self.mu_max) for x in self.means if x != self.mu_max])
+        self.Cp = sum(
+            [
+                (self.mu_max - x) / self.kl(x, self.mu_max)
+                for x in self.means
+                if x != self.mu_max
+            ]
+        )
         # Parameters used for stop learning policy
         self.flag = False
         self.optimal_arm = None
@@ -30,7 +38,7 @@ class BetaBernoulliMAB(GenericMAB):
         :param y: float
         :return: float, KL(B(x), B(y))
         """
-        return x * np.log(x/y) + (1-x) * np.log((1-x)/(1-y))
+        return x * np.log(x / y) + (1 - x) * np.log((1 - x) / (1 - y))
 
     def init_prior(self, a0=1, a1=1):
         """
@@ -56,7 +64,7 @@ class BetaBernoulliMAB(GenericMAB):
                 arm = t
             else:
                 for k in range(self.nb_arms):
-                    theta[k] = np.random.beta(Sa[k]+1, Na[k]-Sa[k]+1)
+                    theta[k] = np.random.beta(Sa[k] + 1, Na[k] - Sa[k] + 1)
                 arm = rd_argmax(theta)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
         return reward, arm_sequence
@@ -76,9 +84,13 @@ class BetaBernoulliMAB(GenericMAB):
         for t in range(T):
             for k in range(self.nb_arms):
                 if Na[k] >= 1:
-                    quantiles[k] = beta.ppf(1-1/((t+1)*np.log(T)**c), Sa[k] + p1, p2 + Na[k] - Sa[k])
+                    quantiles[k] = beta.ppf(
+                        1 - 1 / ((t + 1) * np.log(T) ** c),
+                        Sa[k] + p1,
+                        p2 + Na[k] - Sa[k],
+                    )
                 else:
-                    quantiles[k] = beta.ppf(1-1/((t+1)*np.log(T)**c), p1, p2)
+                    quantiles[k] = beta.ppf(1 - 1 / ((t + 1) * np.log(T) ** c), p1, p2)
             arm = rd_argmax(quantiles)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
         return reward, arm_sequence
@@ -105,18 +117,20 @@ class BetaBernoulliMAB(GenericMAB):
                 for app in range(self.nb_arms):
                     if a != app and app != ap:
                         prod_F1[a, ap] *= F[app]
-                prod_F1[a, ap] *= f[a]/N
+                prod_F1[a, ap] *= f[a] / N
         for a in range(self.nb_arms):
             p_star[a] = (prod_F1[a, a]).sum()
             for ap in range(self.nb_arms):
                 if a != ap:
-                    maap[ap, a] = (prod_F1[a, ap]*G[ap]).sum()/p_star[a]
+                    maap[ap, a] = (prod_F1[a, ap] * G[ap]).sum() / p_star[a]
                 else:
-                    maap[a, a] = (prod_F1[a, a]*X).sum()/p_star[a]
+                    maap[a, a] = (prod_F1[a, a] * X).sum() / p_star[a]
         rho_star = np.inner(np.diag(maap), p_star)
-        delta = rho_star - b1/(b1+b2)
+        delta = rho_star - b1 / (b1 + b2)
         for arm in range(self.nb_arms):
-            sum_log = maap[arm]*np.log(maap[arm]*(b1+b2)/b1) + (1-maap[arm])*np.log((1-maap[arm])*(b1+b2)/b2)
+            sum_log = maap[arm] * np.log(maap[arm] * (b1 + b2) / b1) + (
+                1 - maap[arm]
+            ) * np.log((1 - maap[arm]) * (b1 + b2) / b2)
             g[arm] = np.inner(p_star, sum_log)
         return delta, g, p_star, maap
 
@@ -127,9 +141,9 @@ class BetaBernoulliMAB(GenericMAB):
         :param c: int
         :return: list, gamma(i) for i from 0 to c
         """
-        l = np.ones(c+1)
+        l = np.ones(c + 1)
         for i in range(c):
-            l[i+1] = (i+1)*l[i]
+            l[i + 1] = (i + 1) * l[i]
         return l
 
     def init_approx(self, N, beta1, beta2):
@@ -140,10 +154,20 @@ class BetaBernoulliMAB(GenericMAB):
         :param beta2: np.array, beta values for each arm with posterior Beta(alpha, beta)
         :return: np.arrays, initialization of the arrays for the approximation of the integrals in IDS_approx
         """
-        fact = self.gamma_function(int((beta1+beta2).max()))
-        B = np.array([fact[beta1[i]-1]*fact[beta2[i]-1]/fact[beta1[i]+beta2[i]-1] for i in range(self.nb_arms)])
-        X = np.linspace(1 / N, 1., N)
-        f = np.array([X ** (beta1[i] - 1) * (1. - X) ** (beta2[i] - 1) / B[i] for i in range(self.nb_arms)])
+        fact = self.gamma_function(int((beta1 + beta2).max()))
+        B = np.array(
+            [
+                fact[beta1[i] - 1] * fact[beta2[i] - 1] / fact[beta1[i] + beta2[i] - 1]
+                for i in range(self.nb_arms)
+            ]
+        )
+        X = np.linspace(1 / N, 1.0, N)
+        f = np.array(
+            [
+                X ** (beta1[i] - 1) * (1.0 - X) ** (beta2[i] - 1) / B[i]
+                for i in range(self.nb_arms)
+            ]
+        )
         F = (f / N).cumsum(axis=1)
         G = (f * X / N).cumsum(axis=1)
         maap, p_star = np.zeros((self.nb_arms, self.nb_arms)), np.zeros(self.nb_arms)
@@ -167,10 +191,17 @@ class BetaBernoulliMAB(GenericMAB):
         :return: np.arrays, updates of arrays f, F, G and B
         """
         adjust = beta[0] * y + beta[1] * (1 - y)
-        sign_F_update = 1. if y == 0 else -1.
+        sign_F_update = 1.0 if y == 0 else -1.0
         f[arm] = (X * y + (1 - X) * (1 - y)) * beta.sum() / adjust * f[arm]
-        G[arm] = beta[0] / beta.sum() * (F[arm] - X ** beta[0] * (1. - X) ** beta[1] / beta[0] / B[arm])
-        F[arm] = F[arm] + sign_F_update * X ** beta[0] * (1. - X) ** beta[1] / adjust / B[arm]
+        G[arm] = (
+            beta[0]
+            / beta.sum()
+            * (F[arm] - X ** beta[0] * (1.0 - X) ** beta[1] / beta[0] / B[arm])
+        )
+        F[arm] = (
+            F[arm]
+            + sign_F_update * X ** beta[0] * (1.0 - X) ** beta[1] / adjust / B[arm]
+        )
         B[arm] = B[arm] * adjust / beta.sum()
         return f, F, G, B
 
@@ -194,16 +225,18 @@ class BetaBernoulliMAB(GenericMAB):
                     self.optimal_arm = np.argmax(p_star)
                     arm = self.optimal_arm
                 else:
-                    delta, g, p_star, maap = self.IR_approx(N, beta1, beta2, X, f, F, G, g)
+                    delta, g, p_star, maap = self.IR_approx(
+                        N, beta1, beta2, X, f, F, G, g
+                    )
                     arm = self.IDSAction(delta, g)
             else:
                 arm = self.optimal_arm
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             prev_beta = np.array([copy(beta1[arm]), copy(beta2[arm])])
             # Posterior update
-            beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1-reward[t]
+            beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1 - reward[t]
             if display_results:
-                utils.display_results(delta, g, delta**2/g, p_star)
+                utils.display_results(delta, g, delta ** 2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
         return reward, arm_sequence
 
@@ -222,15 +255,20 @@ class BetaBernoulliMAB(GenericMAB):
                 arm = t
             else:
                 mu = Sa / Na
-                c = np.array([max([mu[i] for i in range(self.nb_arms) if i != arm]) for arm in range(self.nb_arms)])
+                c = np.array(
+                    [
+                        max([mu[i] for i in range(self.nb_arms) if i != arm])
+                        for arm in range(self.nb_arms)
+                    ]
+                )
                 for arm in range(self.nb_arms):
-                    if mu[arm] <= c[arm] < (Sa[arm]+1)/(Na[arm]+1):
-                        v[arm] = mu[arm] * ((Sa[arm]+1)/(Na[arm]+1) - c[arm])
-                    elif Sa[arm]/(Na[arm]+1) < c[arm] < mu[arm]:
-                        v[arm] = (1-mu[arm])*(c[arm]-Sa[arm]/(Na[arm]+1))
+                    if mu[arm] <= c[arm] < (Sa[arm] + 1) / (Na[arm] + 1):
+                        v[arm] = mu[arm] * ((Sa[arm] + 1) / (Na[arm] + 1) - c[arm])
+                    elif Sa[arm] / (Na[arm] + 1) < c[arm] < mu[arm]:
+                        v[arm] = (1 - mu[arm]) * (c[arm] - Sa[arm] / (Na[arm] + 1))
                     else:
                         v[arm] = 0
-                arm = rd_argmax(mu + (T-t)*v)
+                arm = rd_argmax(mu + (T - t) * v)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
         return reward, arm_sequence
 
@@ -248,15 +286,20 @@ class BetaBernoulliMAB(GenericMAB):
                 arm = t
             else:
                 mu = Sa / Na
-                c = np.array([max([mu[i] for i in range(self.nb_arms) if i != arm]) for arm in range(self.nb_arms)])
+                c = np.array(
+                    [
+                        max([mu[i] for i in range(self.nb_arms) if i != arm])
+                        for arm in range(self.nb_arms)
+                    ]
+                )
                 for arm in range(self.nb_arms):
                     if c[arm] >= mu[arm]:
-                        ta = Na[arm] * (c[arm]-mu[arm]) / (1-c[arm]+10e-9)
-                        m[arm] = np.nan_to_num(mu[arm]**ta/ta)
+                        ta = Na[arm] * (c[arm] - mu[arm]) / (1 - c[arm] + 10e-9)
+                        m[arm] = np.nan_to_num(mu[arm] ** ta / ta)
                     else:
-                        ta = Na[arm] * (mu[arm]-c[arm]) / (c[arm]+10e-9)
-                        m[arm] = ((1-mu[arm])**ta)/ta
-                arm = rd_argmax(mu + (T-t)*m)
+                        ta = Na[arm] * (mu[arm] - c[arm]) / (c[arm] + 10e-9)
+                        m[arm] = ((1 - mu[arm]) ** ta) / ta
+                arm = rd_argmax(mu + (T - t) * m)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
         return reward, arm_sequence
 
@@ -279,7 +322,7 @@ class BetaBernoulliMAB(GenericMAB):
                 t = thetas[ap, np.where(theta_hat == a)]
                 Maap[ap, a] = np.nan_to_num(np.mean(t))
                 if ap == a:
-                    p_a[a] = t.shape[1]/M
+                    p_a[a] = t.shape[1] / M
         if np.max(p_a) >= self.threshold:
             # Stop learning policy
             self.optimal_arm = np.argmax(p_a)
@@ -288,13 +331,35 @@ class BetaBernoulliMAB(GenericMAB):
             rho_star = sum([p_a[a] * Maap[a, a] for a in range(self.nb_arms)])
             delta = rho_star - mu
             if VIDS:
-                v = np.array([sum([p_a[ap] * (Maap[a, ap] - mu[a]) ** 2 for ap in range(self.nb_arms)])
-                              for a in range(self.nb_arms)])
-                arm = rd_argmax(-delta ** 2 / v)
+                v = np.array(
+                    [
+                        sum(
+                            [
+                                p_a[ap] * (Maap[a, ap] - mu[a]) ** 2
+                                for ap in range(self.nb_arms)
+                            ]
+                        )
+                        for a in range(self.nb_arms)
+                    ]
+                )
+                arm = rd_argmax(-(delta ** 2) / v)
             else:
-                g = np.array([sum([p_a[ap] * (Maap[a, ap] * np.log(Maap[a, ap]/mu[a]+1e-10) +
-                                              (1-Maap[a, ap]) * np.log((1-Maap[a, ap])/(1-mu[a])+1e-10))
-                                   for ap in range(self.nb_arms)]) for a in range(self.nb_arms)])
+                g = np.array(
+                    [
+                        sum(
+                            [
+                                p_a[ap]
+                                * (
+                                    Maap[a, ap] * np.log(Maap[a, ap] / mu[a] + 1e-10)
+                                    + (1 - Maap[a, ap])
+                                    * np.log((1 - Maap[a, ap]) / (1 - mu[a]) + 1e-10)
+                                )
+                                for ap in range(self.nb_arms)
+                            ]
+                        )
+                        for a in range(self.nb_arms)
+                    ]
+                )
                 arm = self.IDSAction(delta, g)
         return arm, p_a
 
@@ -310,7 +375,9 @@ class BetaBernoulliMAB(GenericMAB):
         beta1, beta2 = self.init_prior()
         Sa, Na, reward, arm_sequence = self.init_lists(T)
         Maap, p_a = np.zeros((self.nb_arms, self.nb_arms)), np.zeros(self.nb_arms)
-        thetas = np.array([np.random.beta(beta1[arm], beta2[arm], M) for arm in range(self.nb_arms)])
+        thetas = np.array(
+            [np.random.beta(beta1[arm], beta2[arm], M) for arm in range(self.nb_arms)]
+        )
         for t in range(T):
             if not self.flag:
                 if np.max(p_a) >= self.threshold:
@@ -323,10 +390,9 @@ class BetaBernoulliMAB(GenericMAB):
                 arm = self.optimal_arm
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             beta1[arm] += reward[t]
-            beta2[arm] += 1-reward[t]
+            beta2[arm] += 1 - reward[t]
             thetas[arm] = np.random.beta(beta1[arm], beta2[arm], M)
         return reward, arm_sequence
-
 
     def VIDS_sample(self, T, M=10000, VIDS=True):
         """
@@ -340,7 +406,9 @@ class BetaBernoulliMAB(GenericMAB):
         Sa, Na, reward, arm_sequence = self.init_lists(T)
         beta1, beta2 = self.init_prior()
         Maap, p_a = np.zeros((self.nb_arms, self.nb_arms)), np.zeros(self.nb_arms)
-        thetas = np.array([np.random.beta(beta1[arm], beta2[arm], M) for arm in range(self.nb_arms)])
+        thetas = np.array(
+            [np.random.beta(beta1[arm], beta2[arm], M) for arm in range(self.nb_arms)]
+        )
         for t in range(T):
             if not self.flag:
                 if np.max(p_a) >= self.threshold:
@@ -354,6 +422,6 @@ class BetaBernoulliMAB(GenericMAB):
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
             # Posterior update
             beta1[arm] += reward[t]
-            beta2[arm] += 1-reward[t]
+            beta2[arm] += 1 - reward[t]
             thetas[arm] = np.random.beta(beta1[arm], beta2[arm], M)
         return reward, arm_sequence

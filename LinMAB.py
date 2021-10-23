@@ -143,15 +143,16 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def FGTS(self, T):
+    def FGTS(self, T, fg_lambda=1.0):
         """
         Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
+        :param fg_lambda: float, coefficient for feel good term
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
         # define model in JAX
         def loglikelihood(theta, x, y):
-            return -((jnp.dot(x, theta) - y) ** 2)
+            return -((jnp.dot(x, theta) - y) ** 2) + fg_lambda * jnp.max(jnp.dot(self.features, theta))
 
         def logprior(theta):
             return -0.5 * jnp.dot(theta, theta) * 100
@@ -166,7 +167,7 @@ class LinMAB:
             # build sampler
             # batch_size = int(0.1*N)
             if t == 0:
-                mu_t, sigma_t = self.initPrior(a0=0, s0=0.1)
+                mu_t, sigma_t = self.initPrior(a0=0, s0=0.01)
                 theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
             else:
                 # if t<=10:
@@ -186,6 +187,14 @@ class LinMAB:
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
+
+    def TS_SGMCMC(self, T):
+        """
+        Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        return self.FGTS(T, fg_lambda=0)
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """

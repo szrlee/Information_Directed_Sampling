@@ -70,6 +70,7 @@ class FGTSLinModel(ArmGaussianLinear):
         Zhang, Tong. "Feel-Good Thompson Sampling for Contextual Bandits and Reinforcement Learning." arXiv preprint arXiv:2110.00871 (2021).
         :param n_features: int, dimension of the feature vectors
         :param n_actions: int, number of actions
+        :param eta: float, std from the reward likelihood model N(a^T.theta, eta)
         """
         super(FGTSLinModel, self).__init__(random_state=np.random.randint(1, 312414))
         self.eta = eta
@@ -121,12 +122,31 @@ class LinMAB:
         self.threshold = 0.9
         self.store_IDS = False
 
-    def initPrior(self, a0=1, s0=10):
+    def initPrior(self, a0=0, s0=0.01):
+        # a0=1, s0=10
         mu_0 = a0 * np.ones(self.d)
         sigma_0 = s0 * np.eye(
             self.d
         )  # to adapt according to the true distribution of theta
         return mu_0, sigma_0
+
+    def updatePosterior(self, a, mu, sigma):
+        """
+        Update posterior mean and covariance matrix
+        :param arm: int, arm chose
+        :param mu: np.array, posterior mean vector
+        :param sigma: np.array, posterior covariance matrix
+        :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
+        """
+        f, r = self.features[a], self.reward(a)[0]
+        s_inv = np.linalg.inv(sigma)
+        ffT = np.outer(f, f)
+        mu_ = np.dot(
+            np.linalg.inv(s_inv + ffT / self.eta ** 2),
+            np.dot(s_inv, mu) + r * f / self.eta ** 2,
+        )
+        sigma_ = np.linalg.inv(s_inv + ffT / self.eta ** 2)
+        return r, mu_, sigma_
 
     def TS(self, T):
         """
@@ -152,10 +172,13 @@ class LinMAB:
         """
         # define model in JAX
         def loglikelihood(theta, x, y):
-            return -((jnp.dot(x, theta) - y) ** 2) + fg_lambda * jnp.max(jnp.dot(self.features, theta))
+            return -((jnp.dot(x, theta) - y) ** 2) + fg_lambda * jnp.max(
+                jnp.dot(self.features, theta)
+            )
 
         def logprior(theta):
             return -0.5 * jnp.dot(theta, theta) * 100
+
         # generate random key in jax
         key = random.PRNGKey(0)
 
@@ -293,24 +316,6 @@ class LinMAB:
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
-
-    def updatePosterior(self, a, mu, sigma):
-        """
-        Update posterior mean and covariance matrix
-        :param arm: int, arm chose
-        :param mu: np.array, posterior mean vector
-        :param sigma: np.array, posterior covariance matrix
-        :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
-        """
-        f, r = self.features[a], self.reward(a)[0]
-        s_inv = np.linalg.inv(sigma)
-        ffT = np.outer(f, f)
-        mu_ = np.dot(
-            np.linalg.inv(s_inv + ffT / self.eta ** 2),
-            np.dot(s_inv, mu) + r * f / self.eta ** 2,
-        )
-        sigma_ = np.linalg.inv(s_inv + ffT / self.eta ** 2)
-        return r, mu_, sigma_
 
     def computeVIDS(self, mu_t, sigma_t, M):
         """

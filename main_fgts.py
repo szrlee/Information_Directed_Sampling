@@ -40,18 +40,19 @@ linear_methods = ["FGTS", "TS_SGMCMC", "TS", "LinUCB", "BayesUCB", "GPUCB", "Tun
 
 """Kind of Bandit problem"""
 check_Linear = True
-store = True  # if you want to store the results
+store = True # if you want to store the results
 FGTSLinMAB = True
+check_time = False
 
 
 # %%
 # Regret
 labels, colors = utils.labelColor(linear_methods)
 lin = exp.LinMAB_expe(
-    n_expe=50,
+    n_expe=1,
     n_features=100,
     n_arms=2,
-    T=1000,
+    T=250,
     methods=linear_methods,
     param_dic=param,
     labels=labels,
@@ -62,3 +63,17 @@ lin = exp.LinMAB_expe(
 # if store:
 #     pkl.dump(lin, open(os.path.join(path, "lin10features.pkl"), "wb"))
 
+# %%
+# Computation
+if check_time:
+    import LinMAB as LM
+
+    for i, j in zip([15, 30, 50, 100], [3, 5, 20, 30]):
+        model = LM.PaperLinModel(u=np.sqrt(1 / 5), n_features=j, n_actions=i)
+        model.threshold = 0.999
+        alg = LM.LinMAB(model)
+        t = time.time()
+        for _ in range(100):
+            model.flag = False
+            alg.VIDS_sample(T=1000, M=10000)
+        print((time.time() - t) / 1000 / 100)

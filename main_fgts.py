@@ -31,13 +31,14 @@ param = {
     "IDS_sample": {"M": 10000, "VIDS": False},
     "VIDS_approx": {"rg": 10.0, "N": 1000},
     "VIDS_sample": {"M": 10000, "VIDS": True},
-    "FGTS": {"fg_lambda": 1}
+    "FGTS": {"fg_lambda": 1},
+    "VIDS_sample_sgmcmc": {"M": 10000},
+    "VIDS_sample_sgmcmc_fg": {"M": 10000, "fg_lambda": 1},
+    "VIDS_sample_sgmcmc_fg10": {"M": 10000, "fg_lambda": 1},
 }
 
-"""methods available : UCB1, TS, UCB_Tuned, BayesUCB, KG, KG_star, Approx_KG_star, MOSS, IDS, IDS_approx"""
-
-# linear_methods = ["TS", "LinUCB", "BayesUCB", "GPUCB", "Tuned_GPUCB", "VIDS_sample"]
-linear_methods = ["FGTS", "TS_SGMCMC", "TS", "LinUCB", "BayesUCB", "GPUCB", "Tuned_GPUCB", "VIDS_sample"]
+# linear_methods = ["FGTS", "TS_SGMCMC", "TS", "LinUCB", "BayesUCB", "GPUCB", "Tuned_GPUCB", "VIDS_sample"]
+linear_methods = ["TS", "TS_SGMCMC", "FGTS", "FGTS10", "VIDS_sample", "VIDS_sample_sgmcmc", "VIDS_sample_sgmcmc_fg", "VIDS_sample_sgmcmc_fg10"]
 
 
 """Kind of Bandit problem"""
@@ -51,10 +52,10 @@ check_time = False
 # Regret
 labels, colors = utils.labelColor(linear_methods)
 lin = exp.LinMAB_expe(
-    n_expe=3,
+    n_expe=10,
     n_features=100,
     n_arms=2,
-    T=300,
+    T=200,
     methods=linear_methods,
     param_dic=param,
     labels=labels,
@@ -62,8 +63,8 @@ lin = exp.LinMAB_expe(
     movieLens=False,
     FGTSLinMAB=FGTSLinMAB,
 )
-# if store:
-#     pkl.dump(lin, open(os.path.join(path, "lin10features.pkl"), "wb"))
+if store:
+    pkl.dump(lin, open(os.path.join(path, "storage/lin10features.pkl"), "wb"))
 
 # %%
 # Computation

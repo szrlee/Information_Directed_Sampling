@@ -176,70 +176,6 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def FGTS(self, T, fg_lambda=1.0):
-        """
-        Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
-        :param T: int, time horizon
-        :param fg_lambda: float, coefficient for feel good term
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        # define model in JAX
-        def loglikelihood(theta, x, y):
-            return -((jnp.dot(x, theta) - y) ** 2) + fg_lambda * jnp.max(
-                jnp.dot(self.features, theta)
-            )
-
-        def logprior(theta):
-            return -0.5 * jnp.dot(theta, theta) * 100
-
-        # generate random key in jax
-        key = random.PRNGKey(np.random.randint(1, 312414))
-        print("fg_lambda={}".format(fg_lambda), key)
-
-        dt = 1e-5
-
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
-
-        for t in range(T):
-            # build sampler
-            # batch_size = int(0.1*N)
-            if t == 0:
-                mu_t, sigma_t = self.initPrior(a0=0, s0=0.01)
-                theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
-            else:
-                # if t<=10:
-                #     batch_size = 1
-                # else:
-                #     batch_size = 10
-                X = jnp.asarray(self.features[arm_sequence[:t]])
-                # y = np.expand_dims(reward[:t], axis=1)
-                y = jnp.asarray(reward[:t])
-                # print(X.shape, y.shape)
-                my_sampler = build_sgld_sampler(
-                    dt, loglikelihood, logprior, (X, y), 1, pbar=False
-                )
-                # run sampler
-                key, subkey = random.split(key)
-                theta_ts = my_sampler(subkey, max(100, t), jnp.zeros(self.d))
-                theta_t = theta_ts[-1:].T
-            # print(theta_t.shape)
-            if jnp.isnan(theta_t).any():
-                # print(self.features)
-                print(theta_ts)
-                print(X, y)
-            a_t = rd_argmax(np.dot(self.features, theta_t))
-            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-            reward[t], arm_sequence[t] = r_t, a_t
-        return reward, arm_sequence
-
-    def TS_SGMCMC(self, T):
-        """
-        Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
-        :param T: int, time horizon
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        return self.FGTS(T, fg_lambda=0)
-
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """
         Implementation of Linear UCB algorithm for Linear Bandits with multivariate normal prior
@@ -338,17 +274,15 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def computeVIDS(self, mu_t, sigma_t, M):
+    def computeVIDS(self, thetas):
         """
         Implementation of linearSampleVIR (algorithm 6 in Russo & Van Roy, p. 244) applied for Linear  Bandits with
         multivariate normal prior. Here integrals are approximated in sampling thetas according to their respective
         posterior distributions.
-        :param mu_t: np.array, posterior mean vector at time t
-        :param sigma_t: np.array, posterior covariance matrix at time t
-        :param M: int, number of samples
+        :param thetas: np.array, posterior samples
         :return: int, np.array, arm chose and p*
         """
-        thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+        M = thetas.shape[0]
         mu = np.mean(thetas, axis=0)
         theta_hat = np.argmax(np.dot(self.features, thetas.T), axis=0)
         theta_hat_ = [thetas[np.where(theta_hat == a)] for a in range(self.n_a)]
@@ -414,9 +348,126 @@ class LinMAB:
                     self.flag = True
                     a_t = self.optimal_arm
                 else:
-                    a_t, p_a = self.computeVIDS(mu_t, sigma_t, M)
+                    thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+                    a_t, p_a = self.computeVIDS(thetas)
             else:
                 a_t = self.optimal_arm
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
+
+    def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):
+        assert n_iters >= n_samples+99
+        # define model in JAX
+        def loglikelihood(theta, x, y):
+            return -((jnp.dot(x, theta) - y) ** 2) + fg_lambda * jnp.max(
+                jnp.dot(self.features, theta)
+            )
+
+        def logprior(theta):
+            return -0.5 * jnp.dot(theta, theta) * 100
+
+        # generate random key in jax
+        key = random.PRNGKey(np.random.randint(1, 312414))
+        # print("fg_lambda={}".format(fg_lambda), key)
+
+        dt = 1e-5
+        my_sampler = build_sgld_sampler(
+                    dt, loglikelihood, logprior, (X, y), 1, pbar=False
+                )
+        # run sampler
+        key, subkey = random.split(key)
+        thetas = my_sampler(subkey, n_iters, jnp.zeros(self.d))
+        return thetas[-n_samples:]
+
+    
+    def FGTS(self, T, fg_lambda=1.0):
+        """
+        Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
+        :param T: int, time horizon
+        :param fg_lambda: float, coefficient for feel good term
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+
+        for t in range(T):
+            if t == 0:
+                mu_t, sigma_t = self.initPrior(a0=0, s0=0.01)
+                theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
+            else:
+                X = jnp.asarray(self.features[arm_sequence[:t]])
+                y = jnp.asarray(reward[:t])
+                theta_t = self.SGLD_Sampler(X, y, n_samples=1, n_iters=max(t,10000+100), fg_lambda=fg_lambda).T
+            if jnp.isnan(theta_t).any():
+                print(theta_t, X, y)
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            reward[t], arm_sequence[t] = self.reward(a_t)[0], a_t
+        return reward, arm_sequence
+
+    def FGTS10(self, T):
+        """
+        Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior and posterios sampling via SGMCMC
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        return self.FGTS(T, fg_lambda=10)
+
+    def TS_SGMCMC(self, T):
+        """
+        Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior and posterios sampling via SGMCMC
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        return self.FGTS(T, fg_lambda=0)
+
+    def VIDS_sample_sgmcmc_fg(self, T, M=10000, fg_lambda=1):
+        """
+        Implementation of V-IDS with approximation of integrals using SGMCMC sampling for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        mu_t, sigma_t = self.initPrior()
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        p_a = np.zeros(self.n_a)
+        for t in range(T):
+            if not self.flag:
+                if np.max(p_a) >= self.threshold:
+                    # Stop learning policy
+                    self.flag = True
+                    a_t = self.optimal_arm
+                else:
+                    if t == 0:
+                        mu_t, sigma_t = self.initPrior(a0=0, s0=0.01)
+                        thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+                    else:
+                        X = jnp.asarray(self.features[arm_sequence[:t]])
+                        y = jnp.asarray(reward[:t])
+                        thetas = self.SGLD_Sampler(X, y, M, max(M+100, t), fg_lambda)
+                    a_t, p_a = self.computeVIDS(thetas)
+            else:
+                a_t = self.optimal_arm
+            reward[t], arm_sequence[t] = self.reward(a_t)[0], a_t
+        return reward, arm_sequence
+
+    def VIDS_sample_sgmcmc(self, T, M=10000):
+        """
+        Implementation of V-IDS with approximation of integrals using SGMCMC sampling for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        return self.VIDS_sample_sgmcmc_fg(T, M, 0)
+
+    def VIDS_sample_sgmcmc_fg10(self, T, M=10000):
+        """
+        Implementation of V-IDS with approximation of integrals using SGMCMC sampling for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        return self.VIDS_sample_sgmcmc_fg(T, M, 10)

@@ -26,9 +26,10 @@ mapping_methods_labels = {
     "Approx_KG_star": "Approximate KG*",
     "KG_star": "KG*",
     "IDS": "Exact IDS",
-    "TS": "Thompson Sampling via Conjugacy",
-    "TS_SGMCMC": "Thompson Sampling via SGMCMC" ,
-    "FGTS": "Feel-Good Thompson Sampling",
+    "TS": "TS - Conjugacy",
+    "TS_SGMCMC": "TS - SGMCMC" ,
+    "FGTS": "Feel-Good TS - SGMCMC-FG1",
+    "FGTS10": "Feel-Good TS - SGMCMC-FG10",
     "BayesUCB": "Bayes UCB",
     "UCB_Tuned": "Tuned UCB",
     "LinUCB": "Linear UCB",
@@ -36,32 +37,46 @@ mapping_methods_labels = {
     "GPUCB": "GP-UCB",
     "Tuned_GPUCB": "Tuned GP-UCB",
     "VIDS_approx": "Grid V-IDS",
-    "VIDS_sample": "Sample V-IDS",
+    "VIDS_sample": "Sample V-IDS - Conjugacy",
+    "VIDS_sample_sgmcmc": "Sample V-IDS - SGMCMC",
+    "VIDS_sample_sgmcmc_fg": "Sample V-IDS - SGMCMC-FG1",
+    "VIDS_sample_sgmcmc_fg10": "Sample V-IDS - SGMCMC-FG10",
     "IDS_approx": "Grid IDS",
     "IDS_sample": "Sample IDS",
     "UCB1": "UCB1",
 }
 
 mapping_methods_colors = {
-    "KG": "yellow",
-    "Approx_KG_star": "orchid",
-    "KG_star": "orchid",
-    "IDS": "chartreuse",
-    "TS": "blue",
-    "FGTS": "brown",
-    "TS_SGMCMC": "pink",
-    "BayesUCB": "cyan",
-    "UCB_Tuned": "red",
-    "LinUCB": "yellow",
-    "MOSS": "black",
-    "GPUCB": "black",
-    "Tuned_GPUCB": "red",
-    "VIDS_approx": "purple",
-    "VIDS_sample": "green",
-    "IDS_approx": "chartreuse",
-    "IDS_sample": "orange",
-    "UCB1": "darkred",
+    "TS": "yellow",
+    "TS_SGMCMC": "orchid",
+    "FGTS": "green",
+    "FGTS10": "chartreuse",
+    "VIDS_sample": "blue",
+    "VIDS_sample_sgmcmc": "brown",
+    "VIDS_sample_sgmcmc_fg": "red",
+    "VIDS_sample_sgmcmc_fg10": "black",
 }
+
+# mapping_methods_colors = {
+#     "KG": "yellow",
+#     "Approx_KG_star": "orchid",
+#     "KG_star": "orchid",
+#     "IDS": "chartreuse",
+#     "TS": "blue",
+#     "FGTS": "brown",
+#     "TS_SGMCMC": "pink",
+#     "BayesUCB": "cyan",
+#     "UCB_Tuned": "red",
+#     "LinUCB": "yellow",
+#     "MOSS": "black",
+#     "GPUCB": "black",
+#     "Tuned_GPUCB": "red",
+#     "VIDS_approx": "purple",
+#     "VIDS_sample": "green",
+#     "IDS_approx": "chartreuse",
+#     "IDS_sample": "orange",
+#     "UCB1": "darkred",
+# }
 
 
 def labelColor(methods):
@@ -104,6 +119,7 @@ def plotRegret(labels, mean_regret, colors, title, log=False):
     :param colors: list, list of colors for the different curves
     :param title: string, plot's title
     """
+    plt.rcParams["figure.figsize"] = (8, 6)
     for i, l in enumerate(labels):
         c = cmap[i] if not colors else colors[i]
         plt.plot(mean_regret[i], c=c, label=l)
@@ -113,7 +129,7 @@ def plotRegret(labels, mean_regret, colors, title, log=False):
     plt.title(title)
     plt.ylabel("Cumulative regret")
     plt.xlabel("Time period")
-    plt.legend()
+    plt.legend(loc='best')
     plt.savefig("./storage/regret.pdf")
 
 

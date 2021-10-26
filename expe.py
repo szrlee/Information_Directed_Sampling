@@ -100,6 +100,7 @@ def LinMAB_expe(
     param_dic,
     labels,
     colors,
+    path,
     doplot=True,
     movieLens=False,
     FGTSLinMAB=False,
@@ -118,17 +119,20 @@ def LinMAB_expe(
     :param colors: list, colors for the curves
     :param doplot: boolean, plot the curves or not
     :param movieLens: boolean, if True uses ColdStartMovieLensModel otherwise PaperLinModel
+    :param path: str
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
     if movieLens:
         models = [LinMAB(ColdStartMovieLensModel()) for _ in range(n_expe)]
         log = True
+        title = "Movie recommendation system"
     elif FGTSLinMAB:
         models = [
             LinMAB(FGTSLinModel(n_features, n_arms))
             for _ in range(n_expe)
         ]
         log = False
+        title = "Linear Gaussian Model (Zhang, 2021)"
     else:
         u = 1 / np.sqrt(5)
         models = [
@@ -136,13 +140,14 @@ def LinMAB_expe(
             for _ in range(n_expe)
         ]
         log = False
+        title = "Linear Gaussian Model (Russo and Van Roy, 2018)"
     if track_ids:
         for m in models:
             m.store_IDS = True
     results = storeRegret(models, methods, param_dic, n_expe, T)
     if doplot:
         plotRegret(
-            labels, results["mean_regret"], colors, "Linear Gaussian Model", log=log
+            labels, results["mean_regret"], colors, title, path, log=log
         )
     if track_ids:
         plot_IDS_results(T, n_expe, results["IDS_results"])

@@ -17,7 +17,12 @@ jax.config.update('jax_platform_name', 'cpu')
 np.random.seed(46)
 
 # configurations
-path = "./"
+from datetime import datetime
+now = datetime.now()
+dir = now.strftime('%Y_%m%d_%H%M_%S')
+path = "./storage/" + dir
+os.makedirs(path, exist_ok=True)
+
 
 param = {
     "UCB1": {"rho": np.sqrt(2)},
@@ -52,19 +57,21 @@ check_time = False
 # Regret
 labels, colors = utils.labelColor(linear_methods)
 lin = exp.LinMAB_expe(
-    n_expe=10,
+    n_expe=2,
     n_features=100,
     n_arms=2,
-    T=200,
+    T=2,
     methods=linear_methods,
     param_dic=param,
     labels=labels,
     colors=colors,
+    path=path,
     movieLens=False,
     FGTSLinMAB=FGTSLinMAB,
 )
+
 if store:
-    pkl.dump(lin, open(os.path.join(path, "storage/lin10features.pkl"), "wb"))
+    pkl.dump(lin, open(os.path.join(path, "lin10features.pkl"), "wb"))
 
 # %%
 # Computation

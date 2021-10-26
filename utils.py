@@ -136,7 +136,8 @@ def storeRegret(models, methods, param_dic, n_expe, T):
             alg = model.__getattribute__(m)
             args = inspect.getfullargspec(alg)[0][2:]
             args = [T] + [param_dic[m][i] for i in args]
-            all_regrets[i, j, :] = model.regret(alg(*args)[0], T)
+            # all_regrets[i, j, :] = model.regret(alg(*args)[0], T)
+            all_regrets[i, j, :] = model.expect_regret(alg(*args)[1], T)
         print({m: round(all_regrets[i, j, -1], 1) for i, m in enumerate(methods)})
         print(
             {

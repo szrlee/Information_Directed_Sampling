@@ -30,4 +30,7 @@ my_sampler = build_sgld_sampler(dt, loglikelihood, logprior, (X_data, y_data), b
 Nsamples = 10_000
 samples = my_sampler(key, Nsamples, jnp.zeros(D))
 
+if jnp.isnan(samples).any():
+    print(jnp.where(jnp.isnan(samples)))
 
+# %%

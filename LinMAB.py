@@ -42,6 +42,18 @@ class ArmGaussianLinear(object):
         best_arm_reward = np.max(np.dot(self.features, self.real_theta))
         return best_arm_reward * np.arange(1, T + 1) - np.cumsum(reward)
 
+    def expect_regret(self, arm_sequence, T):
+        """
+        Compute the regret of a single experiment
+        :param arm_sequence: np.array, sequence of chosen arms obtained from the policy up to time T
+        :param T: int, time horizon
+        :return: np.array, cumulative regret for a single experiment
+        """
+        print(arm_sequence)
+        expect_reward = np.dot(self.features[arm_sequence], self.real_theta)
+        best_arm_reward = np.max(np.dot(self.features, self.real_theta))
+        return best_arm_reward * np.arange(1, T + 1) - np.cumsum(expect_reward)
+
 
 class PaperLinModel(ArmGaussianLinear):
     def __init__(self, u, n_features, n_actions, eta=1, sigma=10):
@@ -110,8 +122,9 @@ class LinMAB:
         :param model: ArmGaussianLinear object
         """
         self.model = model
-        self.regret, self.n_a, self.d, self.features = (
+        self.regret, self.expect_regret, self.n_a, self.d, self.features = (
             model.regret,
+            model.expect_regret,
             model.n_actions,
             model.n_features,
             model.features,
@@ -154,7 +167,7 @@ class LinMAB:
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        arm_sequence, reward = np.zeros(T), np.zeros(T)
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
             theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
@@ -180,9 +193,10 @@ class LinMAB:
             return -0.5 * jnp.dot(theta, theta) * 100
 
         # generate random key in jax
-        key = random.PRNGKey(0)
+        key = random.PRNGKey(np.random.randint(1, 312414))
+        print("fg_lambda={}".format(fg_lambda), key)
 
-        dt = 1e-2
+        dt = 1e-5
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
 
@@ -202,10 +216,17 @@ class LinMAB:
                 y = jnp.asarray(reward[:t])
                 # print(X.shape, y.shape)
                 my_sampler = build_sgld_sampler(
-                    dt, loglikelihood, logprior, (X, y), 10, pbar=False
+                    dt, loglikelihood, logprior, (X, y), 1, pbar=False
                 )
                 # run sampler
-                theta_t = my_sampler(key, 1, jnp.zeros(self.d)).T
+                key, subkey = random.split(key)
+                theta_ts = my_sampler(subkey, max(100, t), jnp.zeros(self.d))
+                theta_t = theta_ts[-1:].T
+            # print(theta_t.shape)
+            if jnp.isnan(theta_t).any():
+                # print(self.features)
+                print(theta_ts)
+                print(X, y)
             a_t = rd_argmax(np.dot(self.features, theta_t))
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
@@ -227,7 +248,7 @@ class LinMAB:
         :param alpha: float, tunable parameter to control between exploration and exploitation
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        arm_sequence, reward = np.zeros(T), np.zeros(T)
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         a_t, A_t, b_t = (
             np.random.randint(0, self.n_a - 1, 1)[0],
             lbda * np.eye(self.d),
@@ -254,7 +275,7 @@ class LinMAB:
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        arm_sequence, reward = np.zeros(T), np.zeros(T)
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
             a_t = rd_argmax(
@@ -275,7 +296,7 @@ class LinMAB:
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        arm_sequence, reward = np.zeros(T), np.zeros(T)
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
             beta_t = 2 * np.log(self.n_a * ((t + 1) * np.pi) ** 2 / 6 / 0.1)
@@ -300,7 +321,7 @@ class LinMAB:
         :param c: float, tunable parameter. Default 0.9
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        arm_sequence, reward = np.zeros(T), np.zeros(T)
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
             beta_t = c * np.log(t + 1)
@@ -384,7 +405,7 @@ class LinMAB:
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
         mu_t, sigma_t = self.initPrior()
-        reward, arm_sequence = np.zeros(T), np.zeros(T)
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
             if not self.flag:

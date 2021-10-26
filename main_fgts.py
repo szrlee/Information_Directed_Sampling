@@ -9,13 +9,15 @@ import os
 import utils
 import time
 
-
+import jax
+# Global flag to set a specific platform, must be used at startup.
+jax.config.update('jax_platform_name', 'cpu')
 # %%
 # random number generation setup
 np.random.seed(46)
 
 # configurations
-path = "/Users/szrlee/Code/Information_Directed_Sampling"
+path = "./"
 
 param = {
     "UCB1": {"rho": np.sqrt(2)},
@@ -49,10 +51,10 @@ check_time = False
 # Regret
 labels, colors = utils.labelColor(linear_methods)
 lin = exp.LinMAB_expe(
-    n_expe=1,
+    n_expe=3,
     n_features=100,
     n_arms=2,
-    T=250,
+    T=300,
     methods=linear_methods,
     param_dic=param,
     labels=labels,

@@ -4,6 +4,7 @@ import numpy as np
 # import jax.numpy as np
 from utils import rd_argmax
 from scipy.stats import norm
+from math import sqrt
 
 import jax.numpy as jnp
 import jax.random as random
@@ -73,10 +74,11 @@ class PaperLinModel(ArmGaussianLinear):
         self.real_theta = self.local_random.multivariate_normal(
             np.zeros(n_features), sigma * np.eye(n_features)
         )
+        self.alg_prior_sigma = sigma
 
 
 class FGTSLinModel(ArmGaussianLinear):
-    def __init__(self, n_features=100, n_actions=2, eta=np.sqrt(0.5)):
+    def __init__(self, n_features=100, n_actions=2, eta=sqrt(0.5)):
         """
         Initialization of the arms, features and theta in
         Zhang, Tong. "Feel-Good Thompson Sampling for Contextual Bandits and Reinforcement Learning." arXiv preprint arXiv:2110.00871 (2021).
@@ -92,6 +94,7 @@ class FGTSLinModel(ArmGaussianLinear):
         # print(self.features)
         self.real_theta = np.zeros(n_features)
         self.real_theta[0:2] = 1.0
+        self.alg_prior_sigma = 0.01
 
     def reward(self, arm):
         """
@@ -114,6 +117,7 @@ class ColdStartMovieLensModel(ArmGaussianLinear):
         self.real_theta = self.local_random.multivariate_normal(
             np.zeros(n_features), sigma * np.eye(n_features)
         )
+        self.alg_prior_sigma = sigma
 
 
 class LinMAB:
@@ -130,13 +134,15 @@ class LinMAB:
             model.features,
         )
         self.reward, self.eta = model.reward, model.eta
+        self.prior_sigma = model.alg_prior_sigma
         self.flag = False
         self.optimal_arm = None
         self.threshold = 0.9
         self.store_IDS = False
 
-    def initPrior(self, a0=0, s0=0.01):
-        # a0=1, s0=10
+    def initPrior(self):
+        a0 = 0
+        s0 = self.prior_sigma
         mu_0 = a0 * np.ones(self.d)
         sigma_0 = s0 * np.eye(
             self.d
@@ -357,15 +363,15 @@ class LinMAB:
         return reward, arm_sequence
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):
-        assert n_iters >= n_samples+99
+        assert n_iters >= n_samples + 99
         # define model in JAX
         def loglikelihood(theta, x, y):
-            return -((jnp.dot(x, theta) - y) ** 2) + fg_lambda * jnp.max(
-                jnp.dot(self.features, theta)
-            )
-
+            return -(
+                1 / (2 * (self.eta ** 2)) * (jnp.dot(x, theta) - y) ** 2
+            ) + fg_lambda * jnp.max(jnp.dot(self.features, theta))
+            
         def logprior(theta):
-            return -0.5 * jnp.dot(theta, theta) * 100
+            return -0.5 * jnp.dot(theta, theta) * (1/self.prior_sigma)
 
         # generate random key in jax
         key = random.PRNGKey(np.random.randint(1, 312414))
@@ -373,14 +379,13 @@ class LinMAB:
 
         dt = 1e-5
         my_sampler = build_sgld_sampler(
-                    dt, loglikelihood, logprior, (X, y), 1, pbar=False
-                )
+            dt, loglikelihood, logprior, (X, y), 1, pbar=False
+        )
         # run sampler
         key, subkey = random.split(key)
         thetas = my_sampler(subkey, n_iters, jnp.zeros(self.d))
         return thetas[-n_samples:]
 
-    
     def FGTS(self, T, fg_lambda=1.0):
         """
         Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
@@ -393,12 +398,14 @@ class LinMAB:
 
         for t in range(T):
             if t == 0:
-                mu_t, sigma_t = self.initPrior(a0=0, s0=0.01)
+                mu_t, sigma_t = self.initPrior()
                 theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
             else:
                 X = jnp.asarray(self.features[arm_sequence[:t]])
                 y = jnp.asarray(reward[:t])
-                theta_t = self.SGLD_Sampler(X, y, n_samples=1, n_iters=max(t,10000+100), fg_lambda=fg_lambda).T
+                theta_t = self.SGLD_Sampler(
+                    X, y, n_samples=1, n_iters=max(t, 10000 + 100), fg_lambda=fg_lambda
+                ).T
             if jnp.isnan(theta_t).any():
                 print(theta_t, X, y)
             a_t = rd_argmax(np.dot(self.features, theta_t))
@@ -429,7 +436,6 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        mu_t, sigma_t = self.initPrior()
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
@@ -440,12 +446,12 @@ class LinMAB:
                     a_t = self.optimal_arm
                 else:
                     if t == 0:
-                        mu_t, sigma_t = self.initPrior(a0=0, s0=0.01)
+                        mu_t, sigma_t = self.initPrior()
                         thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
                     else:
                         X = jnp.asarray(self.features[arm_sequence[:t]])
                         y = jnp.asarray(reward[:t])
-                        thetas = self.SGLD_Sampler(X, y, M, max(M+100, t), fg_lambda)
+                        thetas = self.SGLD_Sampler(X, y, M, max(M + 100, t), fg_lambda)
                     a_t, p_a = self.computeVIDS(thetas)
             else:
                 a_t = self.optimal_arm

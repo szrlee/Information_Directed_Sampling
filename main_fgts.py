@@ -49,7 +49,6 @@ linear_methods = ["TS", "TS_SGMCMC", "FGTS", "FGTS10", "VIDS_sample", "VIDS_samp
 """Kind of Bandit problem"""
 check_Linear = True
 store = True # if you want to store the results
-FGTSLinMAB = True
 check_time = False
 
 
@@ -67,7 +66,7 @@ lin = exp.LinMAB_expe(
     colors=colors,
     path=path,
     movieLens=False,
-    FGTSLinMAB=FGTSLinMAB,
+    FGTSLinMAB=False,
 )
 
 if store:

@@ -94,7 +94,7 @@ class FreqPaperLinModel(ArmGaussianLinear):
         :param sigma: float, multiplicative factor for the covariance matrix of theta which is drawn from a
         multivariate distribution N(0, sigma*I)
         """
-        super(PaperLinModel, self).__init__(
+        super(FreqPaperLinModel, self).__init__(
             prior_random_state=0,
             reward_random_state=np.random.randint(1, 312414),
         )

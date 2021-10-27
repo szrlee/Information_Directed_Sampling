@@ -4,6 +4,7 @@ import numpy as np
 # import jax.numpy as np
 from utils import rd_argmax
 from scipy.stats import norm
+
 from math import sqrt
 
 import jax.numpy as jnp
@@ -12,8 +13,9 @@ from sgmcmcjax.samplers import build_sgld_sampler
 
 
 class ArmGaussianLinear(object):
-    def __init__(self, random_state=0):
-        self.local_random = np.random.RandomState(random_state)
+    def __init__(self, prior_random_state=2021, reward_random_state=2022):
+        self.prior_random = np.random.RandomState(prior_random_state)
+        self.reward_random = np.random.RandomState(reward_random_state)
 
     def reward(self, arm):
         """
@@ -21,7 +23,7 @@ class ArmGaussianLinear(object):
         :param arm: int
         :return: float
         """
-        return np.dot(self.features[arm], self.real_theta) + self.local_random.normal(
+        return np.dot(self.features[arm], self.real_theta) + self.reward_random.normal(
             0, self.eta, 1
         )
 
@@ -68,10 +70,37 @@ class PaperLinModel(ArmGaussianLinear):
         :param sigma: float, multiplicative factor for the covariance matrix of theta which is drawn from a
         multivariate distribution N(0, sigma*I)
         """
-        super(PaperLinModel, self).__init__(random_state=np.random.randint(1, 312414))
+        super(PaperLinModel, self).__init__(
+            prior_random_state=np.random.randint(1, 312414),
+            reward_random_state=np.random.randint(1, 312414),
+        )
         self.eta = eta
-        self.features = self.local_random.uniform(-u, u, (n_actions, n_features))
-        self.real_theta = self.local_random.multivariate_normal(
+        self.features = self.prior_random.uniform(-u, u, (n_actions, n_features))
+        self.real_theta = self.prior_random.multivariate_normal(
+            np.zeros(n_features), sigma * np.eye(n_features)
+        )
+        self.alg_prior_sigma = sigma
+
+class FreqPaperLinModel(ArmGaussianLinear):
+    def __init__(self, u, n_features, n_actions, eta=1, sigma=10):
+        """
+        (Frequentist modification: use fixed random seed to sample arms, features and theta.)
+        Initialization of the arms, features and theta in
+        Russo, Daniel, and Benjamin Van Roy. "Learning to optimize via information-directed sampling." Operations Research 66.1 (2018): 230-252.
+        :param u: float, features are drawn from a uniform Unif(-u, u)
+        :param n_features: int, dimension of the feature vectors
+        :param n_actions: int, number of actions
+        :param eta: float, std from the reward N(a^T.theta, eta)
+        :param sigma: float, multiplicative factor for the covariance matrix of theta which is drawn from a
+        multivariate distribution N(0, sigma*I)
+        """
+        super(PaperLinModel, self).__init__(
+            prior_random_state=0,
+            reward_random_state=np.random.randint(1, 312414),
+        )
+        self.eta = eta
+        self.features = self.prior_random.uniform(-u, u, (n_actions, n_features))
+        self.real_theta = self.prior_random.multivariate_normal(
             np.zeros(n_features), sigma * np.eye(n_features)
         )
         self.alg_prior_sigma = sigma
@@ -86,11 +115,19 @@ class FGTSLinModel(ArmGaussianLinear):
         :param n_actions: int, number of actions
         :param eta: float, std from the reward likelihood model N(a^T.theta, eta)
         """
-        super(FGTSLinModel, self).__init__(random_state=np.random.randint(1, 312414))
+        super(FGTSLinModel, self).__init__(
+            prior_random_state=0,
+            reward_random_state=np.random.randint(1, 312414),
+        )
         self.eta = eta
         self.features = np.zeros((n_actions, n_features))
         self.features[0, 0] = 1.0
-        self.features[1, 1] = np.sqrt(0.2)
+        self.features[1, 1] = 0.2
+        if n_actions > 2:
+            self.features[2:] = self.prior_random.uniform(-1, 1, (n_actions-2, n_features)) 
+            self.features[2:] = 0.2 * self.features[2:] / np.expand_dims(np.linalg.norm(self.features[2:], axis=1), axis=1)
+            # print(self.features)
+            # print(np.linalg.norm(self.features, axis=1))
         # print(self.features)
         self.real_theta = np.zeros(n_features)
         self.real_theta[0:2] = 1.0
@@ -102,7 +139,7 @@ class FGTSLinModel(ArmGaussianLinear):
         :param arm: int
         :return: float
         """
-        return np.dot(self.features[arm], self.real_theta) + self.local_random.uniform(
+        return np.dot(self.features[arm], self.real_theta) + self.reward_random.uniform(
             -0.5, 0.5, 1
         )
 
@@ -110,11 +147,12 @@ class FGTSLinModel(ArmGaussianLinear):
 class ColdStartMovieLensModel(ArmGaussianLinear):
     def __init__(self, n_features=30, n_actions=207, eta=1, sigma=10):
         super(ColdStartMovieLensModel, self).__init__(
-            random_state=np.random.randint(1, 312414)
+            prior_random_state=np.random.randint(1, 312414),
+            reward_random_state=np.random.randint(1, 312414),
         )
         self.eta = eta
         self.features = np.loadtxt("Data/Vt.csv", delimiter=",").T
-        self.real_theta = self.local_random.multivariate_normal(
+        self.real_theta = self.prior_random.multivariate_normal(
             np.zeros(n_features), sigma * np.eye(n_features)
         )
         self.alg_prior_sigma = sigma
@@ -176,6 +214,10 @@ class LinMAB:
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
+            # print(t)
+            # print(sigma_t)
+            # if np.isnan(mu_t, sigma_t).any():
+            #     print(mu_t, sigma_t)
             theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
@@ -288,9 +330,11 @@ class LinMAB:
         :param thetas: np.array, posterior samples
         :return: int, np.array, arm chose and p*
         """
+        # print(thetas.shape)
         M = thetas.shape[0]
         mu = np.mean(thetas, axis=0)
         theta_hat = np.argmax(np.dot(self.features, thetas.T), axis=0)
+        # print("theta_hat shape: {}".format(theta_hat.shape))
         theta_hat_ = [thetas[np.where(theta_hat == a)] for a in range(self.n_a)]
         p_a = np.array([len(theta_hat_[a]) for a in range(self.n_a)]) / M
         if np.max(p_a) >= self.threshold:
@@ -298,6 +342,7 @@ class LinMAB:
             self.optimal_arm = np.argmax(p_a)
             arm = self.optimal_arm
         else:
+            # print("theta_hat_[0]: {}, theta_hat_[0] length: {}".format(theta_hat_[0], len(theta_hat_[0])))
             mu_a = np.nan_to_num(
                 np.array(
                     [
@@ -369,9 +414,9 @@ class LinMAB:
             return -(
                 1 / (2 * (self.eta ** 2)) * (jnp.dot(x, theta) - y) ** 2
             ) + fg_lambda * jnp.max(jnp.dot(self.features, theta))
-            
+
         def logprior(theta):
-            return -0.5 * jnp.dot(theta, theta) * (1/self.prior_sigma)
+            return -0.5 * jnp.dot(theta, theta) * (1 / self.prior_sigma)
 
         # generate random key in jax
         key = random.PRNGKey(np.random.randint(1, 312414))
@@ -384,6 +429,8 @@ class LinMAB:
         # run sampler
         key, subkey = random.split(key)
         thetas = my_sampler(subkey, n_iters, jnp.zeros(self.d))
+        # if jnp.isnan(thetas).any():
+        #     print(jnp.where(jnp.isnan(thetas)))
         return thetas[-n_samples:]
 
     def FGTS(self, T, fg_lambda=1.0):
@@ -406,8 +453,6 @@ class LinMAB:
                 theta_t = self.SGLD_Sampler(
                     X, y, n_samples=1, n_iters=max(t, 10000 + 100), fg_lambda=fg_lambda
                 ).T
-            if jnp.isnan(theta_t).any():
-                print(theta_t, X, y)
             a_t = rd_argmax(np.dot(self.features, theta_t))
             reward[t], arm_sequence[t] = self.reward(a_t)[0], a_t
         return reward, arm_sequence

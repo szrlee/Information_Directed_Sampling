@@ -3,7 +3,13 @@ from MAB import GenericMAB
 from BernoulliMAB import BetaBernoulliMAB
 from GaussianMAB import GaussianMAB
 from FiniteSetsMAB import FiniteSets
-from LinMAB import FGTSLinModel,PaperLinModel, ColdStartMovieLensModel, LinMAB
+from LinMAB import (
+    FGTSLinModel,
+    PaperLinModel,
+    FreqPaperLinModel,
+    ColdStartMovieLensModel,
+    LinMAB,
+)
 from utils import (
     plotRegret,
     storeRegret,
@@ -101,10 +107,9 @@ def LinMAB_expe(
     labels,
     colors,
     path,
+    problem='FreqRusso',
     doplot=True,
-    movieLens=False,
-    FGTSLinMAB=False,
-    track_ids=False,
+    # track_ids=False,
 ):
     """
     Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
@@ -118,40 +123,45 @@ def LinMAB_expe(
     :param labels: list, labels for the curves
     :param colors: list, colors for the curves
     :param doplot: boolean, plot the curves or not
-    :param movieLens: boolean, if True uses ColdStartMovieLensModel otherwise PaperLinModel
+    :param problem: str, choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
     :param path: str
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
-    if movieLens:
+    if problem == 'movieLens':
         models = [LinMAB(ColdStartMovieLensModel()) for _ in range(n_expe)]
         log = True
-        title = "Movie recommendation system"
-    elif FGTSLinMAB:
+        title = "Movie recommendation system - n_arm: 207 - n_features: 30"
+    elif problem == 'Zhang':
+        models = [LinMAB(FGTSLinModel(n_features, n_arms)) for _ in range(n_expe)]
+        log = False
+        title = "Linear Gaussian Model (Zhang, 2021) - n_arms: {} - n_features: {}".format(n_arms, n_features)
+    elif problem == 'FreqRusso':
+        u = 1 / np.sqrt(5)
         models = [
-            LinMAB(FGTSLinModel(n_features, n_arms))
+            LinMAB(FreqPaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         log = False
-        title = "Linear Gaussian Model (Zhang, 2021)"
-    else:
+        title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
+    elif problem == 'Russo':
         u = 1 / np.sqrt(5)
         models = [
             LinMAB(PaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         log = False
-        title = "Linear Gaussian Model (Russo and Van Roy, 2018)"
-    if track_ids:
-        for m in models:
-            m.store_IDS = True
+        title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
+    else:
+        raise NotImplementedError
+    # if track_ids:
+    #     for m in models:
+    #         m.store_IDS = True
     print("Begin experiments on '{}'".format(title))
     results = storeRegret(models, methods, param_dic, n_expe, T)
     if doplot:
-        plotRegret(
-            labels, results["mean_regret"], colors, title, path, log=log
-        )
-    if track_ids:
-        plot_IDS_results(T, n_expe, results["IDS_results"])
+        plotRegret(labels, results["mean_regret"], colors, title, path, log=log)
+    # if track_ids:
+    #     plot_IDS_results(T, n_expe, results["IDS_results"])
     return results
 
 

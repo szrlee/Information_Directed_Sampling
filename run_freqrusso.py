@@ -41,13 +41,13 @@ param = {
     "Tuned_GPUCB": {"c": 0.9},
     "IDS": {"M": 1000},
     "IDS_approx": {"N": 1000, "display_results": False},
-    "IDS_sample": {"M": 10000, "VIDS": False},
+    "IDS_sample": {"M": 10000, "VIDS": False}, # The parameter VIDS is only reserved for Bernoulli MAB
     "VIDS_approx": {"rg": 10.0, "N": 1000},
-    "VIDS_sample": {"M": 10000, "VIDS": True},
+    "VIDS_sample": {"M": 10000, "VIDS": True}, # The parameter VIDS is only reserved for Bernoulli MAB
     "FGTS": {"fg_lambda": 1},
     "VIDS_sample_sgmcmc": {"M": 10000},
     "VIDS_sample_sgmcmc_fg": {"M": 10000, "fg_lambda": 1},
-    "VIDS_sample_sgmcmc_fg10": {"M": 10000, "fg_lambda": 1},
+    "VIDS_sample_sgmcmc_fg01": {"M": 10000},
 }
 
 # linear_methods = ["FGTS", "TS_SGMCMC", "TS", "LinUCB", "BayesUCB", "GPUCB", "Tuned_GPUCB", "VIDS_sample"]
@@ -55,11 +55,11 @@ linear_methods = [
     "TS",
     "TS_SGMCMC",
     "FGTS",
-    "FGTS10",
+    "FGTS01",
     "VIDS_sample",
     "VIDS_sample_sgmcmc",
     "VIDS_sample_sgmcmc_fg",
-    "VIDS_sample_sgmcmc_fg10",
+    "VIDS_sample_sgmcmc_fg01",
 ]
 
 
@@ -75,7 +75,7 @@ labels, colors = utils.labelColor(linear_methods)
 lin = exp.LinMAB_expe(
     n_expe=20,
     n_features=5,
-    n_arms=10,
+    n_arms=30,
     T=500,
     methods=linear_methods,
     param_dic=param,

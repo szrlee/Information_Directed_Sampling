@@ -173,9 +173,9 @@ class LinMAB:
         )
         self.reward, self.eta = model.reward, model.eta
         self.prior_sigma = model.alg_prior_sigma
-        self.flag = False
-        self.optimal_arm = None
-        self.threshold = 0.9
+        # self.flag = False
+        # self.optimal_arm = None
+        self.threshold = 0.999
         self.store_IDS = False
 
     def initPrior(self):
@@ -337,48 +337,48 @@ class LinMAB:
         # print("theta_hat shape: {}".format(theta_hat.shape))
         theta_hat_ = [thetas[np.where(theta_hat == a)] for a in range(self.n_a)]
         p_a = np.array([len(theta_hat_[a]) for a in range(self.n_a)]) / M
-        if np.max(p_a) >= self.threshold:
-            # Stop learning policy
-            self.optimal_arm = np.argmax(p_a)
-            arm = self.optimal_arm
-        else:
-            # print("theta_hat_[0]: {}, theta_hat_[0] length: {}".format(theta_hat_[0], len(theta_hat_[0])))
-            mu_a = np.nan_to_num(
-                np.array(
-                    [
-                        np.mean([theta_hat_[a]], axis=1).squeeze()
-                        for a in range(self.n_a)
-                    ]
-                )
-            )
-            L_hat = np.sum(
-                np.array(
-                    [
-                        p_a[a] * np.outer(mu_a[a] - mu, mu_a[a] - mu)
-                        for a in range(self.n_a)
-                    ]
-                ),
-                axis=0,
-            )
-            rho_star = np.sum(
-                np.array(
-                    [
-                        p_a[a] * np.dot(self.features[a], mu_a[a])
-                        for a in range(self.n_a)
-                    ]
-                ),
-                axis=0,
-            )
-            v = np.array(
+        # if np.max(p_a) >= self.threshold:
+        #     # Stop learning policy
+        #     self.optimal_arm = np.argmax(p_a)
+        #     arm = self.optimal_arm
+        # else:
+        # print("theta_hat_[0]: {}, theta_hat_[0] length: {}".format(theta_hat_[0], len(theta_hat_[0])))
+        mu_a = np.nan_to_num(
+            np.array(
                 [
-                    np.dot(np.dot(self.features[a], L_hat), self.features[a].T)
+                    np.mean([theta_hat_[a]], axis=1).squeeze()
                     for a in range(self.n_a)
                 ]
             )
-            delta = np.array(
-                [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
-            )
-            arm = rd_argmax(-(delta ** 2) / v)
+        )
+        L_hat = np.sum(
+            np.array(
+                [
+                    p_a[a] * np.outer(mu_a[a] - mu, mu_a[a] - mu)
+                    for a in range(self.n_a)
+                ]
+            ),
+            axis=0,
+        )
+        rho_star = np.sum(
+            np.array(
+                [
+                    p_a[a] * np.dot(self.features[a], mu_a[a])
+                    for a in range(self.n_a)
+                ]
+            ),
+            axis=0,
+        )
+        v = np.array(
+            [
+                np.dot(np.dot(self.features[a], L_hat), self.features[a].T)
+                for a in range(self.n_a)
+            ]
+        )
+        delta = np.array(
+            [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
+        )
+        arm = rd_argmax(-(delta ** 2) / v)
         return arm, p_a
 
     def VIDS_sample(self, T, M=10000):
@@ -389,20 +389,18 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
+
         mu_t, sigma_t = self.initPrior()
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            if not self.flag:
-                if np.max(p_a) >= self.threshold:
-                    # Stop learning policy
-                    self.flag = True
-                    a_t = self.optimal_arm
-                else:
-                    thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
-                    a_t, p_a = self.computeVIDS(thetas)
+            # print("max posterior probability of action: {}".format(np.max(p_a)))
+            if np.max(p_a) >= self.threshold:
+                # Stop learning policy
+                a_t = np.argmax(p_a)
             else:
-                a_t = self.optimal_arm
+                thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+                a_t, p_a = self.computeVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
@@ -423,15 +421,21 @@ class LinMAB:
         # print("fg_lambda={}".format(fg_lambda), key)
 
         dt = 1e-5
+        N = X.shape[0]
+        # print(N)
+        batch_size = int(0.1*(N+9))
+        # print(batch_size)
         my_sampler = build_sgld_sampler(
-            dt, loglikelihood, logprior, (X, y), 1, pbar=False
+            dt, loglikelihood, logprior, (X, y), batch_size, pbar=False
         )
         # run sampler
         key, subkey = random.split(key)
         thetas = my_sampler(subkey, n_iters, jnp.zeros(self.d))
         # if jnp.isnan(thetas).any():
         #     print(jnp.where(jnp.isnan(thetas)))
-        return thetas[-n_samples:]
+        sample_idx = 100 * jnp.arange(n_samples) + 10000
+        # print(sample_idx)
+        return thetas[sample_idx]
 
     def FGTS(self, T, fg_lambda=1.0):
         """
@@ -451,13 +455,13 @@ class LinMAB:
                 X = jnp.asarray(self.features[arm_sequence[:t]])
                 y = jnp.asarray(reward[:t])
                 theta_t = self.SGLD_Sampler(
-                    X, y, n_samples=1, n_iters=max(t, 10000 + 100), fg_lambda=fg_lambda
+                    X, y, n_samples=1, n_iters=max(100 * 1 + 10000, t), fg_lambda=fg_lambda
                 ).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             reward[t], arm_sequence[t] = self.reward(a_t)[0], a_t
         return reward, arm_sequence
 
-    def FGTS10(self, T):
+    def FGTS01(self, T):
         """
         Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior and posterios sampling via SGMCMC
         :param T: int, time horizon
@@ -484,22 +488,20 @@ class LinMAB:
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            if not self.flag:
-                if np.max(p_a) >= self.threshold:
-                    # Stop learning policy
-                    self.flag = True
-                    a_t = self.optimal_arm
-                else:
-                    if t == 0:
-                        mu_t, sigma_t = self.initPrior()
-                        thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
-                    else:
-                        X = jnp.asarray(self.features[arm_sequence[:t]])
-                        y = jnp.asarray(reward[:t])
-                        thetas = self.SGLD_Sampler(X, y, M, max(M + 100, t), fg_lambda)
-                    a_t, p_a = self.computeVIDS(thetas)
+            # print("max posterior probability of action: {}".format(np.max(p_a)))
+            if np.max(p_a) >= self.threshold:
+                # print("stop")
+                # Stop learning policy
+                a_t = np.argmax(p_a)
             else:
-                a_t = self.optimal_arm
+                if t == 0:
+                    mu_t, sigma_t = self.initPrior()
+                    thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+                else:
+                    X = jnp.asarray(self.features[arm_sequence[:t]])
+                    y = jnp.asarray(reward[:t])
+                    thetas = self.SGLD_Sampler(X, y, M, max(100 * M + 10000, t), fg_lambda)
+                a_t, p_a = self.computeVIDS(thetas)
             reward[t], arm_sequence[t] = self.reward(a_t)[0], a_t
         return reward, arm_sequence
 
@@ -513,7 +515,7 @@ class LinMAB:
         """
         return self.VIDS_sample_sgmcmc_fg(T, M, 0)
 
-    def VIDS_sample_sgmcmc_fg10(self, T, M=10000):
+    def VIDS_sample_sgmcmc_fg01(self, T, M=10000):
         """
         Implementation of V-IDS with approximation of integrals using SGMCMC sampling for Linear Bandits with multivariate
         normal prior
@@ -521,4 +523,4 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        return self.VIDS_sample_sgmcmc_fg(T, M, 10)
+        return self.VIDS_sample_sgmcmc_fg(T, M, 0.1)

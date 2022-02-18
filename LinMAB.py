@@ -1,5 +1,9 @@
 """ Packages import """
 import numpy as np
+import collections
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 # import jax.numpy as np
 from utils import rd_argmax
@@ -157,6 +161,97 @@ class ColdStartMovieLensModel(ArmGaussianLinear):
         )
         self.alg_prior_sigma = sigma
 
+class PriorHyperLinear(torch.nn.Module):
+    def __init__(
+            self,
+            input_size: int,
+            output_size: int,
+            prior_mean: float or np.ndarray = 0.,
+            prior_std: float or np.ndarray = 1.,
+    ):
+        super().__init__()
+
+        self.in_features, self.out_features = input_size, output_size
+        # (fan-out, fan-in)
+        self.weight = np.random.randn(output_size, input_size).astype(np.float32)
+        self.weight = self.weight / np.linalg.norm(self.weight, axis=1, keepdims=True)
+
+        if isinstance(prior_mean, np.ndarray):
+            self.bias = prior_mean
+        else:
+            self.bias = np.ones(output_size, dtype=np.float32) * prior_mean
+
+        if isinstance(prior_std, np.ndarray):
+            if prior_std.ndim == 1:
+                assert len(prior_std) == output_size
+                prior_std = np.diag(prior_std).astype(np.float32)
+            elif prior_std.ndim == 2:
+                assert prior_std.shape == (output_size, output_size)
+                prior_std = prior_std
+            else:
+                raise ValueError
+        else:
+            assert isinstance(prior_std, (float, int, np.float32, np.int32, np.float64, np.int64))
+            prior_std = np.eye(output_size, dtype=np.float32) * prior_std
+
+        self.weight = torch.nn.Parameter(torch.from_numpy(prior_std @ self.weight).float())
+        self.bias = torch.nn.Parameter(torch.from_numpy(self.bias).float())
+
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def forward(self, x):
+        out = torch.nn.functional.linear(x, self.weight.to(x.device), self.bias.to(x.device))
+        return out
+
+    def extra_repr(self):
+        return 'in_features={}, out_features={}, bias={}'.format(
+            self.in_features, self.out_features, not np.all(self.bias.cpu().detach().numpy() == 0)
+        )
+
+class HyperLinear(nn.Module):
+    def __init__(self, noise_dim, out_features):
+        super().__init__()
+        self.hypermodel = nn.Linear(noise_dim, out_features)
+        self.priormodel = PriorHyperLinear(noise_dim, out_features)
+
+    def forward(self, x, z):
+        theta = self.get_theta(z)
+        out = torch.mul(x, theta).sum(-1)
+        return out
+
+    def get_theta(self, z):
+        theta = self.hypermodel(z)
+        prior_theta = self.priormodel(z)
+        theta += prior_theta
+        return theta
+
+class ReplayBuffer():
+    def __init__(self, buffer_limit, noise_dim=32, noise_std=0.01):
+        self.buffer = collections.deque(maxlen=buffer_limit)
+        self.noise_dim = noise_dim
+        self.noise_std = noise_std
+
+    def _unit_sphere_noise(self):
+        noise = np.random.normal(0, 1, self.noise_dim) * self.noise_std
+        noise /= np.sum(np.sqrt((noise**2)))
+        return noise
+
+    def put(self, transition):
+        target_z = self._unit_sphere_noise()
+        transition += (target_z, )
+        self.buffer.append(transition)
+
+    def sample(self, n):
+        buffer_size = len(self.buffer)
+        batch_index = np.random.randint(low=0, high=buffer_size, size=n)
+        f_list, r_list, z_list = [], [], []
+        for index in batch_index:
+            f, r, z = self.buffer[index]
+            f_list.append(f)
+            r_list.append(r)
+            z_list.append(z)
+        return np.array(f_list), np.array(r_list), np.array(z_list)
 
 class LinMAB:
     def __init__(self, model):
@@ -403,6 +498,51 @@ class LinMAB:
                 a_t, p_a = self.computeVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t] = r_t, a_t
+        return reward, arm_sequence
+
+    def VIDS_sample_hyper(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
+        """
+        Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        model = HyperLinear(noise_dim, self.d).to(device) # init hypermodel
+        optim = torch.optim.Adam(model.parameters(), lr=lr) # init optimizer
+        loss_fn = nn.MSELoss() # init loss function
+        buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        p_a = np.zeros(self.n_a)
+        for t in range(T):
+            # print("max posterior probability of action: {}".format(np.max(p_a)))
+            if np.max(p_a) >= self.threshold:
+                # Stop learning policy
+                a_t = np.argmax(p_a)
+            else:
+                action_noise = torch.randn(size=(M, noise_dim)).to(device) # sample noise for action
+                with torch.no_grad():
+                    thetas = model.get_theta(action_noise).cpu().numpy()
+                a_t, p_a = self.computeVIDS(thetas)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            reward[t], arm_sequence[t] = r_t, a_t
+            buffer.put((f_t, r_t))
+            # update hypermodel
+            for _ in range(update_num):
+                f_batch, r_batch, z_batch = buffer.sample(batch_size)
+                z_batch = torch.FloatTensor(z_batch).to(device)
+                f_batch = torch.FloatTensor(f_batch).to(device)
+                r_batch = torch.FloatTensor(r_batch).to(device)
+                update_noise = torch.randn(size=(batch_size, noise_dim)).to(device) # sample noise for update
+                target_noise = torch.mul(z_batch, update_noise).sum(-1) # noise for target
+                predict = model(f_batch, update_noise)
+                loss = loss_fn(predict, r_batch+target_noise)
+                optim.zero_grad()
+                loss.backward()
+                optim.step()
         return reward, arm_sequence
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):

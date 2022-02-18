@@ -53,7 +53,7 @@ mapping_methods_colors = {
     "FGTS": "green",
     "FGTS01": "chartreuse",
     "VIDS_sample": "blue",
-    "VIDS_sample_hyper": "purple",
+    "VIDS_sample_hyper": "darkorange",
     "VIDS_sample_sgmcmc": "brown",
     "VIDS_sample_sgmcmc_fg": "red",
     "VIDS_sample_sgmcmc_fg01": "black",

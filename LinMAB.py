@@ -253,6 +253,41 @@ class ReplayBuffer():
             z_list.append(z)
         return np.array(f_list), np.array(r_list), np.array(z_list)
 
+class HyperModel():
+    def __init__(self, noise_dim, feature_dim, lr):
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.model = HyperLinear(noise_dim, feature_dim).to(self.device) # init hypermodel
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=lr) # init optimizer
+        self.loss_fn = nn.MSELoss() # init loss function
+
+        self.noise_dim = noise_dim
+        self.feature_dim = feature_dim
+        self.lr = lr
+
+    def update(self, f_batch, r_batch, z_batch):
+        batch_size = f_batch.shape[0]
+        z_batch = torch.FloatTensor(z_batch).to(self.device)
+        f_batch = torch.FloatTensor(f_batch).to(self.device)
+        r_batch = torch.FloatTensor(r_batch).to(self.device)
+        update_noise = torch.randn(size=(batch_size, self.noise_dim)).to(self.device) # sample noise for update
+        target_noise = torch.mul(z_batch, update_noise).sum(-1) # noise for target
+        predict = self.model(f_batch, update_noise)
+        loss = self.loss_fn(predict, r_batch+target_noise)
+        self.optim.zero_grad()
+        loss.backward()
+        self.optim.step()
+
+    def sample_theta(self, M):
+        action_noise = torch.randn(size=(M, self.noise_dim)).to(self.device) # sample noise for action
+        with torch.no_grad():
+            thetas = self.model.get_theta(action_noise).cpu().numpy()
+        return thetas
+
+    def reset(self):
+        self.model = HyperLinear(self.noise_dim, self.feature_dim).to(self.device) # init hypermodel
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer 
+
+
 class LinMAB:
     def __init__(self, model):
         """
@@ -509,10 +544,7 @@ class LinMAB:
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
 
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        model = HyperLinear(noise_dim, self.d).to(device) # init hypermodel
-        optim = torch.optim.Adam(model.parameters(), lr=lr) # init optimizer
-        loss_fn = nn.MSELoss() # init loss function
+        model = HyperModel(noise_dim, self.d, lr)
         buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -523,9 +555,7 @@ class LinMAB:
                 # Stop learning policy
                 a_t = np.argmax(p_a)
             else:
-                action_noise = torch.randn(size=(M, noise_dim)).to(device) # sample noise for action
-                with torch.no_grad():
-                    thetas = model.get_theta(action_noise).cpu().numpy()
+                thetas = model.sample_theta(M)
                 a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t] = r_t, a_t
@@ -533,16 +563,7 @@ class LinMAB:
             # update hypermodel
             for _ in range(update_num):
                 f_batch, r_batch, z_batch = buffer.sample(batch_size)
-                z_batch = torch.FloatTensor(z_batch).to(device)
-                f_batch = torch.FloatTensor(f_batch).to(device)
-                r_batch = torch.FloatTensor(r_batch).to(device)
-                update_noise = torch.randn(size=(batch_size, noise_dim)).to(device) # sample noise for update
-                target_noise = torch.mul(z_batch, update_noise).sum(-1) # noise for target
-                predict = model(f_batch, update_noise)
-                loss = loss_fn(predict, r_batch+target_noise)
-                optim.zero_grad()
-                loss.backward()
-                optim.step()
+                model.update(f_batch, r_batch, z_batch)
         return reward, arm_sequence
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):

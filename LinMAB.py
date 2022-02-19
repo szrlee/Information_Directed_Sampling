@@ -354,6 +354,32 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
+    def TS_hyper(self, T, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
+        """
+        Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        model = HyperModel(noise_dim, self.d, lr)
+        buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        for t in range(T):
+            # print(t)
+            # print(sigma_t)
+            # if np.isnan(mu_t, sigma_t).any():
+            #     print(mu_t, sigma_t)
+            theta_t = model.sample_theta(1).T
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            reward[t], arm_sequence[t] = r_t, a_t
+            buffer.put((f_t, r_t))
+            # update hypermodel
+            for _ in range(update_num):
+                f_batch, r_batch, z_batch = buffer.sample(batch_size)
+                model.update(f_batch, r_batch, z_batch)
+        return reward, arm_sequence
+
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """
         Implementation of Linear UCB algorithm for Linear Bandits with multivariate normal prior

@@ -27,6 +27,7 @@ mapping_methods_labels = {
     "KG_star": "KG*",
     "IDS": "Exact IDS",
     "TS": "TS - Conjugacy",
+    "TS_hyper": "TS - HyperModel",
     "TS_SGMCMC": "TS - SGMCMC" ,
     "FGTS": "Feel-Good TS - SGMCMC-FG_1e0",
     "FGTS01": "Feel-Good TS - SGMCMC-FG_1e-1",
@@ -49,6 +50,7 @@ mapping_methods_labels = {
 
 mapping_methods_colors = {
     "TS": "yellow",
+    "TS_hyper": "tan",
     "TS_SGMCMC": "orchid",
     "FGTS": "green",
     "FGTS01": "chartreuse",

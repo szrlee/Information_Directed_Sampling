@@ -253,6 +253,35 @@ class ReplayBuffer():
             z_list.append(z)
         return np.array(f_list), np.array(r_list), np.array(z_list)
 
+class ReplayBufferV2():
+    def __init__(self, noise_dim=32, noise_std=0.01):
+        self.f_list = []
+        self.r_list = []
+        self.z_list = []
+        self.noise_dim = noise_dim
+        self.noise_std = noise_std
+
+    def _unit_sphere_noise(self):
+        noise = np.random.normal(0, 1, self.noise_dim) * self.noise_std
+        noise /= np.sum(np.sqrt((noise**2)))
+        return noise
+
+    def put(self, transition):
+        f, r = transition
+        z = self._unit_sphere_noise()
+        self.f_list.append(f)
+        self.r_list.append(r)
+        self.z_list.append(z)
+
+    def get(self, shuffle=True):
+        sample_num = len(self.f_list)
+        index = list(range(sample_num))
+        if shuffle:
+            np.random.shuffle(index)
+        f_data, r_data, z_data = np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
+        f_data, r_data, z_data = f_data[index], r_data[index], z_data[index]
+        return f_data, r_data, z_data
+
 class HyperModel():
     def __init__(self, noise_dim, feature_dim, lr):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -378,6 +407,44 @@ class LinMAB:
             for _ in range(update_num):
                 f_batch, r_batch, z_batch = buffer.sample(batch_size)
                 model.update(f_batch, r_batch, z_batch)
+        return reward, arm_sequence
+
+    def TS_hyper_reset(self, T, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
+        """
+        Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        model = HyperModel(noise_dim, self.d, lr)
+        buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        for t in range(T):
+            # print(t)
+            # print(sigma_t)
+            # if np.isnan(mu_t, sigma_t).any():
+            #     print(mu_t, sigma_t)
+            theta_t = model.sample_theta(1).T
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            reward[t], arm_sequence[t] = r_t, a_t
+            buffer.put((f_t, r_t))
+            # update hypermodel
+            model.reset()
+            f_data, r_data, z_data = buffer.get()
+            sample_num = f_data.shape[0]
+            for _ in range(update_num):
+                if sample_num > batch_size:
+                    for i in range(0, batch_size, sample_num):
+                        f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]
+                        model.update(f_batch, r_batch, z_batch)
+                    if sample_num % batch_size !=0:
+                        last_sample = sample_num % batch_size
+                        model.update(f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:])
+                else:
+                    index = np.random.randint(low=0, high=sample_num, size=batch_size)
+                    f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
+                    model.update(f_batch, r_batch, z_batch)
         return reward, arm_sequence
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
@@ -591,6 +658,50 @@ class LinMAB:
                 f_batch, r_batch, z_batch = buffer.sample(batch_size)
                 model.update(f_batch, r_batch, z_batch)
         return reward, arm_sequence
+
+    def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
+        """
+        Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+
+        model = HyperModel(noise_dim, self.d, lr)
+        buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        p_a = np.zeros(self.n_a)
+        for t in range(T):
+            # print("max posterior probability of action: {}".format(np.max(p_a)))
+            if np.max(p_a) >= self.threshold:
+                # Stop learning policy
+                a_t = np.argmax(p_a)
+            else:
+                thetas = model.sample_theta(M)
+                a_t, p_a = self.computeVIDS(thetas)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            reward[t], arm_sequence[t] = r_t, a_t
+            buffer.put((f_t, r_t))
+            # update hypermodel
+            model.reset()
+            f_data, r_data, z_data = buffer.get()
+            sample_num = f_data.shape[0]
+            for _ in range(update_num):
+                if sample_num > batch_size:
+                    for i in range(0, batch_size, sample_num):
+                        f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]
+                        model.update(f_batch, r_batch, z_batch)
+                    if sample_num % batch_size !=0:
+                        last_sample = sample_num % batch_size
+                        model.update(f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:])
+                else:
+                    index = np.random.randint(low=0, high=sample_num, size=batch_size)
+                    f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
+                    model.update(f_batch, r_batch, z_batch)
+        return reward, arm_sequence
+
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):
         assert n_iters >= n_samples + 99

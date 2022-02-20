@@ -214,6 +214,8 @@ class HyperLinear(nn.Module):
         super().__init__()
         self.hypermodel = nn.Linear(noise_dim, out_features)
         self.priormodel = PriorHyperLinear(noise_dim, out_features)
+        for param in self.priormodel.parameters():
+            param.requires_grad = False
 
     def forward(self, x, z):
         theta = self.get_theta(z)
@@ -431,9 +433,9 @@ class LinMAB:
             buffer.put((f_t, r_t))
             # update hypermodel
             model.reset()
-            f_data, r_data, z_data = buffer.get()
-            sample_num = f_data.shape[0]
+            sample_num = t + 1
             for _ in range(update_num):
+                f_data, r_data, z_data = buffer.get()
                 if sample_num > batch_size:
                     for i in range(0, batch_size, sample_num):
                         f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]
@@ -686,9 +688,9 @@ class LinMAB:
             buffer.put((f_t, r_t))
             # update hypermodel
             model.reset()
-            f_data, r_data, z_data = buffer.get()
-            sample_num = f_data.shape[0]
+            sample_num = t + 1
             for _ in range(update_num):
+                f_data, r_data, z_data = buffer.get()
                 if sample_num > batch_size:
                     for i in range(0, batch_size, sample_num):
                         f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]

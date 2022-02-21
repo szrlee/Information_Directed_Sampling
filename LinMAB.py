@@ -607,6 +607,66 @@ class LinMAB:
         arm = rd_argmax(-(delta ** 2) / (v + 1e-6))
         return arm, p_a
 
+    def solveVIDS(self, thetas):
+        M = thetas.shape[0]
+        mu = np.mean(thetas, axis=0)
+        theta_hat = np.argmax(np.dot(self.features, thetas.T), axis=0)
+        theta_hat_ = [thetas[np.where(theta_hat == a)] for a in range(self.n_a)]
+        p_a = np.array([len(theta_hat_[a]) for a in range(self.n_a)]) / M
+        mu_a = np.nan_to_num(
+            np.array(
+                [
+                    np.mean([theta_hat_[a]], axis=1).squeeze()
+                    for a in range(self.n_a)
+                ]
+            )
+        )
+        L_hat = np.sum(
+            np.array(
+                [
+                    p_a[a] * np.outer(mu_a[a] - mu, mu_a[a] - mu)
+                    for a in range(self.n_a)
+                ]
+            ),
+            axis=0,
+        )
+        rho_star = np.sum(
+            np.array(
+                [
+                    p_a[a] * np.dot(self.features[a], mu_a[a])
+                    for a in range(self.n_a)
+                ]
+            ),
+            axis=0,
+        )
+        v = np.array(
+            [
+                np.dot(np.dot(self.features[a], L_hat), self.features[a].T)
+                for a in range(self.n_a)
+            ]
+        )
+        delta = np.array(
+            [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
+        )
+        prob = np.zeros(shape=(self.n_a, self.n_a))
+        psi = np.ones(shape=(self.n_a, self.n_a)) * np.inf
+        for i in range(self.n_a-1):
+            for j in range(i+1, self.n_a):
+                if delta[j] < delta[i]:
+                    D1, D2, I1, I2, flip = delta[j], delta[i], v[j], v[i], True
+                else:
+                    D1, D2, I1, I2, flip = delta[i], delta[j], v[i], v[j], False
+                p = np.clip((D1 / (D2 - D1)) - (2 * I1 / (I2 - I1)), 0., 1.) if I1 < I2 else 0.
+                psi[i][j] = ((1 - p) * D1 + p * D2)**2 / ((1 - p) * I1 + p * I2)
+                prob[i][j] = 1 - p if flip else p
+        psi = psi.flatten()
+        optim_indexes = np.nonzero(psi == psi.min())[0].tolist()
+        optim_index = np.random.choice(optim_indexes)
+        optim_index = [optim_index // self.n_a, optim_index % self.n_a]
+        optim_prob = prob[optim_index[0], optim_index[1]]
+        arm = np.random.choice(optim_index, p=[1 - optim_prob, optim_prob])
+        return arm, p_a
+
     def VIDS_sample(self, T, M=10000):
         """
         Implementation of V-IDS with approximation of integrals using MC sampling for Linear Bandits with multivariate
@@ -684,6 +744,105 @@ class LinMAB:
             else:
                 thetas = model.sample_theta(M)
                 a_t, p_a = self.computeVIDS(thetas)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            reward[t], arm_sequence[t] = r_t, a_t
+            buffer.put((f_t, r_t))
+            # update hypermodel
+            model.reset()
+            sample_num = t + 1
+            for _ in range(update_num):
+                f_data, r_data, z_data = buffer.get()
+                if sample_num > batch_size:
+                    for i in range(0, batch_size, sample_num):
+                        f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]
+                        model.update(f_batch, r_batch, z_batch)
+                    if sample_num % batch_size !=0:
+                        last_sample = sample_num % batch_size
+                        f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
+                        model.update(f_batch, r_batch, z_batch)
+                else:
+                    index = np.random.randint(low=0, high=sample_num, size=batch_size)
+                    f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
+                    model.update(f_batch, r_batch, z_batch)
+        return reward, arm_sequence
+
+    def VIDS_sample_solution(self, T, M=10000):
+        """
+        Implementation of V-IDS with approximation of integrals using MC sampling for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+
+        mu_t, sigma_t = self.initPrior()
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        p_a = np.zeros(self.n_a)
+        for t in range(T):
+            # print("max posterior probability of action: {}".format(np.max(p_a)))
+            if np.max(p_a) >= self.threshold:
+                # Stop learning policy
+                a_t = np.argmax(p_a)
+            else:
+                thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+                a_t, p_a = self.solveVIDS(thetas)
+            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            reward[t], arm_sequence[t] = r_t, a_t
+        return reward, arm_sequence
+
+    def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
+        """
+        Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+
+        model = HyperModel(noise_dim, self.d, lr)
+        buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        p_a = np.zeros(self.n_a)
+        for t in range(T):
+            # print("max posterior probability of action: {}".format(np.max(p_a)))
+            if np.max(p_a) >= self.threshold:
+                # Stop learning policy
+                a_t = np.argmax(p_a)
+            else:
+                thetas = model.sample_theta(M)
+                a_t, p_a = self.solveVIDS(thetas)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            reward[t], arm_sequence[t] = r_t, a_t
+            buffer.put((f_t, r_t))
+            # update hypermodel
+            for _ in range(update_num):
+                f_batch, r_batch, z_batch = buffer.sample(batch_size)
+                model.update(f_batch, r_batch, z_batch)
+        return reward, arm_sequence
+
+    def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
+        """
+        Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
+        normal prior
+        :param T: int, time horizon
+        :param M: int, number of samples. Default: 10 000
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+
+        model = HyperModel(noise_dim, self.d, lr)
+        buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
+
+        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        p_a = np.zeros(self.n_a)
+        for t in range(T):
+            # print("max posterior probability of action: {}".format(np.max(p_a)))
+            if np.max(p_a) >= self.threshold:
+                # Stop learning policy
+                a_t = np.argmax(p_a)
+            else:
+                thetas = model.sample_theta(M)
+                a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t] = r_t, a_t
             buffer.put((f_t, r_t))

@@ -442,7 +442,8 @@ class LinMAB:
                         model.update(f_batch, r_batch, z_batch)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
-                        model.update(f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:])
+                        f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
+                        model.update(f_batch, r_batch, z_batch)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)
                     f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
@@ -603,7 +604,7 @@ class LinMAB:
         delta = np.array(
             [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
         )
-        arm = rd_argmax(-(delta ** 2) / v)
+        arm = rd_argmax(-(delta ** 2) / (v + 1e-6))
         return arm, p_a
 
     def VIDS_sample(self, T, M=10000):
@@ -697,13 +698,13 @@ class LinMAB:
                         model.update(f_batch, r_batch, z_batch)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
-                        model.update(f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:])
+                        f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
+                        model.update(f_batch, r_batch, z_batch)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)
                     f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
                     model.update(f_batch, r_batch, z_batch)
         return reward, arm_sequence
-
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):
         assert n_iters >= n_samples + 99

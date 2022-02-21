@@ -604,7 +604,7 @@ class LinMAB:
         delta = np.array(
             [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
         )
-        arm = rd_argmax(-(delta ** 2) / (v + 1e-6))
+        arm = rd_argmax(-(delta ** 2) / (v + 1e-20))
         return arm, p_a
 
     def solveVIDS(self, thetas):
@@ -657,7 +657,7 @@ class LinMAB:
                 else:
                     D1, D2, I1, I2, flip = delta[i], delta[j], v[i], v[j], False
                 p = np.clip((D1 / (D2 - D1)) - (2 * I1 / (I2 - I1)), 0., 1.) if I1 < I2 else 0.
-                psi[i][j] = ((1 - p) * D1 + p * D2)**2 / ((1 - p) * I1 + p * I2)
+                psi[i][j] = ((1 - p) * D1 + p * D2)**2 / ((1 - p) * I1 + p * I2 + 1e-20)
                 prob[i][j] = 1 - p if flip else p
         psi = psi.flatten()
         optim_indexes = np.nonzero(psi == psi.min())[0].tolist()

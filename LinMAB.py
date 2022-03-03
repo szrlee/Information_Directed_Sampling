@@ -3,7 +3,6 @@ import numpy as np
 import collections
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 # import jax.numpy as np
 from utils import rd_argmax
@@ -163,11 +162,11 @@ class ColdStartMovieLensModel(ArmGaussianLinear):
 
 class PriorHyperLinear(torch.nn.Module):
     def __init__(
-            self,
-            input_size: int,
-            output_size: int,
-            prior_mean: float or np.ndarray = 0.,
-            prior_std: float or np.ndarray = 1.,
+        self,
+        input_size: int,
+        output_size: int,
+        prior_mean: float or np.ndarray = 0.,
+        prior_std: float or np.ndarray = 1.,
     ):
         super().__init__()
 
@@ -210,12 +209,23 @@ class PriorHyperLinear(torch.nn.Module):
         )
 
 class HyperLinear(nn.Module):
-    def __init__(self, noise_dim, out_features):
+    def __init__(
+        self,
+        noise_dim,
+        out_features,
+        prior_std: float or np.ndarray = 1.0,
+        prior_mean: float or np.ndarray = 0.0,
+        prior_scale: float = 1.0,
+        posterior_scale: float = 1.0
+    ):
         super().__init__()
         self.hypermodel = nn.Linear(noise_dim, out_features)
-        self.priormodel = PriorHyperLinear(noise_dim, out_features)
+        self.priormodel = PriorHyperLinear(noise_dim, out_features, prior_mean, prior_std)
         for param in self.priormodel.parameters():
             param.requires_grad = False
+
+        self.prior_scale = prior_scale
+        self.posterior_scale = posterior_scale
 
     def forward(self, x, z):
         theta = self.get_theta(z)
@@ -225,8 +235,13 @@ class HyperLinear(nn.Module):
     def get_theta(self, z):
         theta = self.hypermodel(z)
         prior_theta = self.priormodel(z)
-        theta += prior_theta
+        theta = self.posterior_scale * theta + self.prior_scale  + prior_theta
         return theta
+
+    def regularization(self, z):
+        theta = self.hypermodel(z)
+        reg_loss = theta.pow(2).mean()
+        return reg_loss
 
 class ReplayBuffer():
     def __init__(self, buffer_limit, noise_dim=32, noise_std=0.01):
@@ -285,38 +300,70 @@ class ReplayBufferV2():
         return f_data, r_data, z_data
 
 class HyperModel():
-    def __init__(self, noise_dim, feature_dim, lr):
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.model = HyperLinear(noise_dim, feature_dim).to(self.device) # init hypermodel
-        self.optim = torch.optim.Adam(self.model.parameters(), lr=lr) # init optimizer
-        self.loss_fn = nn.MSELoss() # init loss function
+    def __init__(
+        self,
+        noise_dim,
+        feature_dim,
+        prior_std: float or np.ndarray = 1.0,
+        prior_mean: float or np.ndarray = 0.0,
+        prior_scale: float = 1.0,
+        posterior_scale: float = 1.0,
+        lr: float = 0.01,
+        norm_coef: float = 0.01,
+        target_noise_coef: float = 0.01,
+    ):
 
         self.noise_dim = noise_dim
         self.feature_dim = feature_dim
+        self.prior_std = prior_std
+        self.prior_mean = prior_mean
+        self.prior_scale = prior_scale
+        self.posterior_scale = posterior_scale
         self.lr = lr
+        self.norm_coef = norm_coef
+        self.target_noise_coef = target_noise_coef
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    def update(self, f_batch, r_batch, z_batch):
+        self.init_model_optim()
+        print('initialize hypermodel')
+
+    def init_model_optim(self):
+        self.model = HyperLinear(
+            self.noise_dim, self.feature_dim,
+            self.prior_std, self.prior_mean,
+            self.prior_scale, self.posterior_scale
+        ).to(self.device) # init hypermodel
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer
+
+    def update(self, f_batch, r_batch, z_batch, sample_num):
         batch_size = f_batch.shape[0]
         z_batch = torch.FloatTensor(z_batch).to(self.device)
         f_batch = torch.FloatTensor(f_batch).to(self.device)
         r_batch = torch.FloatTensor(r_batch).to(self.device)
-        update_noise = torch.randn(size=(batch_size, self.noise_dim)).to(self.device) # sample noise for update
-        target_noise = torch.mul(z_batch, update_noise).sum(-1) # noise for target
+        update_noise = self.generate_noise(batch_size) # sample noise for update
+        target_noise = torch.mul(z_batch, update_noise).sum(-1) * self.target_noise_coef # noise for target
         predict = self.model(f_batch, update_noise)
-        loss = self.loss_fn(predict, r_batch+target_noise)
+        diff = target_noise + r_batch - predict
+        loss = diff.pow(2).mean()
+        reg_loss = self.model.regularization(update_noise) * (self.norm_coef / sample_num)
+        loss += reg_loss
         self.optim.zero_grad()
         loss.backward()
         self.optim.step()
 
     def sample_theta(self, M):
-        action_noise = torch.randn(size=(M, self.noise_dim)).to(self.device) # sample noise for action
+        action_noise = self.generate_noise(M)
         with torch.no_grad():
             thetas = self.model.get_theta(action_noise).cpu().numpy()
         return thetas
 
+    def generate_noise(self, batch_size):
+        noise = torch.randn(batch_size, self.noise_dim).type(torch.float32).to(self.device)
+        return noise
+
     def reset(self):
-        self.model = HyperLinear(self.noise_dim, self.feature_dim).to(self.device) # init hypermodel
-        self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer 
+        self.init_model_optim()
+        print('reset hypermodel')
 
 
 class LinMAB:
@@ -385,13 +432,13 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def TS_hyper(self, T, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
+    def TS_hyper(self, T, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=2):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        model = HyperModel(noise_dim, self.d, lr)
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
         buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -408,16 +455,16 @@ class LinMAB:
             # update hypermodel
             for _ in range(update_num):
                 f_batch, r_batch, z_batch = buffer.sample(batch_size)
-                model.update(f_batch, r_batch, z_batch)
+                model.update(f_batch, r_batch, z_batch, sample_num=t+1)
         return reward, arm_sequence
 
-    def TS_hyper_reset(self, T, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
+    def TS_hyper_reset(self, T, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=1):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        model = HyperModel(noise_dim, self.d, lr)
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
         buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -439,15 +486,15 @@ class LinMAB:
                 if sample_num > batch_size:
                     for i in range(0, batch_size, sample_num):
                         f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]
-                        model.update(f_batch, r_batch, z_batch)
+                        model.update(f_batch, r_batch, z_batch, sample_num)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
                         f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
-                        model.update(f_batch, r_batch, z_batch)
+                        model.update(f_batch, r_batch, z_batch, sample_num)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)
                     f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
-                    model.update(f_batch, r_batch, z_batch)
+                    model.update(f_batch, r_batch, z_batch, sample_num)
         return reward, arm_sequence
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
@@ -691,7 +738,7 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def VIDS_sample_hyper(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
+    def VIDS_sample_hyper(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=2):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -700,7 +747,7 @@ class LinMAB:
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
 
-        model = HyperModel(noise_dim, self.d, lr)
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
         buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -719,10 +766,10 @@ class LinMAB:
             # update hypermodel
             for _ in range(update_num):
                 f_batch, r_batch, z_batch = buffer.sample(batch_size)
-                model.update(f_batch, r_batch, z_batch)
+                model.update(f_batch, r_batch, z_batch, sample_num=t+1)
         return reward, arm_sequence
 
-    def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
+    def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=1):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -731,7 +778,7 @@ class LinMAB:
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
 
-        model = HyperModel(noise_dim, self.d, lr)
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
         buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -755,15 +802,15 @@ class LinMAB:
                 if sample_num > batch_size:
                     for i in range(0, batch_size, sample_num):
                         f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]
-                        model.update(f_batch, r_batch, z_batch)
+                        model.update(f_batch, r_batch, z_batch, sample_num)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
                         f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
-                        model.update(f_batch, r_batch, z_batch)
+                        model.update(f_batch, r_batch, z_batch, sample_num)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)
                     f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
-                    model.update(f_batch, r_batch, z_batch)
+                    model.update(f_batch, r_batch, z_batch, sample_num)
         return reward, arm_sequence
 
     def VIDS_sample_solution(self, T, M=10000):
@@ -790,7 +837,7 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
+    def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=2):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -799,7 +846,7 @@ class LinMAB:
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
 
-        model = HyperModel(noise_dim, self.d, lr)
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
         buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -818,10 +865,10 @@ class LinMAB:
             # update hypermodel
             for _ in range(update_num):
                 f_batch, r_batch, z_batch = buffer.sample(batch_size)
-                model.update(f_batch, r_batch, z_batch)
+                model.update(f_batch, r_batch, z_batch, sample_num=t+1)
         return reward, arm_sequence
 
-    def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
+    def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=1):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -830,7 +877,7 @@ class LinMAB:
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
 
-        model = HyperModel(noise_dim, self.d, lr)
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
         buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -854,15 +901,15 @@ class LinMAB:
                 if sample_num > batch_size:
                     for i in range(0, batch_size, sample_num):
                         f_batch, r_batch, z_batch = f_data[i:i+batch_size], r_data[i: i+batch_size], z_data[i:i+batch_size]
-                        model.update(f_batch, r_batch, z_batch)
+                        model.update(f_batch, r_batch, z_batch, sample_num)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
                         f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
-                        model.update(f_batch, r_batch, z_batch)
+                        model.update(f_batch, r_batch, z_batch, sample_num)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)
                     f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
-                    model.update(f_batch, r_batch, z_batch)
+                    model.update(f_batch, r_batch, z_batch, sample_num)
         return reward, arm_sequence
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):

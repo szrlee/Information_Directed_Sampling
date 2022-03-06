@@ -359,6 +359,7 @@ class HyperModel():
 
     def generate_noise(self, batch_size):
         noise = torch.randn(batch_size, self.noise_dim).type(torch.float32).to(self.device)
+        # noise = noise / torch.norm(noise, dim=1, keepdim=True)
         return noise
 
     def reset(self):
@@ -432,13 +433,15 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def TS_hyper(self, T, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=2):
+    def TS_hyper(self, T, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
+        target_noise_coef = self.eta
+        norm_coef = (self.eta / self.prior_sigma)**2
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
         buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -458,13 +461,15 @@ class LinMAB:
                 model.update(f_batch, r_batch, z_batch, sample_num=t+1)
         return reward, arm_sequence
 
-    def TS_hyper_reset(self, T, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=1):
+    def TS_hyper_reset(self, T, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
+        target_noise_coef = self.eta
+        norm_coef = (self.eta / self.prior_sigma)**2
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
         buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -738,7 +743,7 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def VIDS_sample_hyper(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=2):
+    def VIDS_sample_hyper(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -746,8 +751,9 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-
-        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
+        target_noise_coef = self.eta
+        norm_coef = (self.eta / self.prior_sigma)**2
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
         buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -769,7 +775,7 @@ class LinMAB:
                 model.update(f_batch, r_batch, z_batch, sample_num=t+1)
         return reward, arm_sequence
 
-    def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=1):
+    def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -777,8 +783,9 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-
-        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
+        target_noise_coef = self.eta
+        norm_coef = (self.eta / self.prior_sigma)**2
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
         buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -837,7 +844,7 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=2):
+    def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=2):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -845,8 +852,9 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-
-        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
+        target_noise_coef = self.eta
+        norm_coef = (self.eta / self.prior_sigma)**2
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
         buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
@@ -868,7 +876,7 @@ class LinMAB:
                 model.update(f_batch, r_batch, z_batch, sample_num=t+1)
         return reward, arm_sequence
 
-    def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, norm_coef=0.01, batch_size=32, update_num=1):
+    def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=32, lr=0.01, batch_size=32, update_num=1):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -876,8 +884,9 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-
-        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=self.eta, norm_coef=norm_coef)
+        target_noise_coef = self.eta
+        norm_coef = (self.eta / self.prior_sigma)**2
+        model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
         buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)

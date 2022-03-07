@@ -244,14 +244,13 @@ class HyperLinear(nn.Module):
         return reg_loss
 
 class ReplayBuffer():
-    def __init__(self, buffer_limit, noise_dim=32, noise_std=0.01):
+    def __init__(self, buffer_limit, noise_dim=32):
         self.buffer = collections.deque(maxlen=buffer_limit)
         self.noise_dim = noise_dim
-        self.noise_std = noise_std
 
     def _unit_sphere_noise(self):
-        noise = np.random.normal(0, 1, self.noise_dim) * self.noise_std
-        noise /= np.sum(np.sqrt((noise**2)))
+        noise = np.random.randn(1, self.noise_dim).astype(np.float32)
+        noise /= np.linalg.norm(noise, axis=1)
         return noise
 
     def put(self, transition):
@@ -271,16 +270,15 @@ class ReplayBuffer():
         return np.array(f_list), np.array(r_list), np.array(z_list)
 
 class ReplayBufferV2():
-    def __init__(self, noise_dim=32, noise_std=0.01):
+    def __init__(self, noise_dim=32):
         self.f_list = []
         self.r_list = []
         self.z_list = []
         self.noise_dim = noise_dim
-        self.noise_std = noise_std
 
     def _unit_sphere_noise(self):
-        noise = np.random.normal(0, 1, self.noise_dim) * self.noise_std
-        noise /= np.sum(np.sqrt((noise**2)))
+        noise = np.random.randn(1, self.noise_dim).astype(np.float32)
+        noise /= np.linalg.norm(noise, axis=1)
         return noise
 
     def put(self, transition):
@@ -494,7 +492,10 @@ class LinMAB:
                         model.update(f_batch, r_batch, z_batch, sample_num)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
-                        f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
+                        index1 = -np.arange(1, last_sample + 1).astype(np.int32)
+                        index2 = np.random.randint(low=0, high=sample_num, size=batch_size-last_sample)
+                        index = np.hstack([index1, index2])
+                        f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
                         model.update(f_batch, r_batch, z_batch, sample_num)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)
@@ -812,7 +813,10 @@ class LinMAB:
                         model.update(f_batch, r_batch, z_batch, sample_num)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
-                        f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
+                        index1 = -np.arange(1, last_sample + 1).astype(np.int32)
+                        index2 = np.random.randint(low=0, high=sample_num, size=batch_size-last_sample)
+                        index = np.hstack([index1, index2])
+                        f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
                         model.update(f_batch, r_batch, z_batch, sample_num)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)
@@ -913,7 +917,11 @@ class LinMAB:
                         model.update(f_batch, r_batch, z_batch, sample_num)
                     if sample_num % batch_size !=0:
                         last_sample = sample_num % batch_size
-                        f_batch, r_batch, z_batch = f_data[-last_sample:], r_data[-last_sample:], z_data[-last_sample:]
+                        index1 = -np.arange(1, last_sample + 1).astype(np.int32)
+                        index2 = np.random.randint(low=0, high=sample_num, size=batch_size-last_sample)
+                        index = np.hstack([index1, index2])
+                        f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
+                        model.update(f_batch, r_batch, z_batch, sample_num)
                         model.update(f_batch, r_batch, z_batch, sample_num)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)

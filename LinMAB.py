@@ -331,7 +331,8 @@ class HyperModel():
             self.prior_std, self.prior_mean,
             self.prior_scale, self.posterior_scale
         ).to(self.device) # init hypermodel
-        self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer
+        # self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer
+        self.optim = torch.optim.SGD(self.model.parameters(), lr=self.lr) # init optimizer
 
     def update(self, f_batch, r_batch, z_batch, sample_num):
         batch_size = f_batch.shape[0]
@@ -921,7 +922,6 @@ class LinMAB:
                         index2 = np.random.randint(low=0, high=sample_num, size=batch_size-last_sample)
                         index = np.hstack([index1, index2])
                         f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
-                        model.update(f_batch, r_batch, z_batch, sample_num)
                         model.update(f_batch, r_batch, z_batch, sample_num)
                 else:
                     index = np.random.randint(low=0, high=sample_num, size=batch_size)

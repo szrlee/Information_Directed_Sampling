@@ -125,7 +125,7 @@ def display_results(delta, g, ratio, p_star):
     print("p_star {}".format(p_star))
 
 
-def plotRegret(labels, mean_regret, std_regret, colors, title, path, log=False):
+def plotRegret(labels, regret, colors, title, path, log=False):
     """
     Plot Bayesian regret
     :param labels: list, list of labels for the different curves
@@ -133,12 +133,15 @@ def plotRegret(labels, mean_regret, std_regret, colors, title, path, log=False):
     :param colors: list, list of colors for the different curves
     :param title: string, plot's title
     """
+    mean_regret, std_regret = regret['mean_regret'], regret['std_regret']
+    max_regret, min_regret = regret['max_regret'], regret['min_regret']
     plt.rcParams["figure.figsize"] = (8, 6)
     for i, l in enumerate(labels):
         c = cmap[i] if not colors else colors[i]
         x = np.arange(len(mean_regret[i]))
         plt.plot(x, mean_regret[i], c=c, label=l)
-        plt.fill_between(x, mean_regret[i]-std_regret[i], mean_regret[i]+std_regret[i], color=c, alpha=0.2)
+        # plt.fill_between(x, min_regret[i], max_regret[i], color=c, alpha=0.2)
+        # plt.fill_between(x, mean_regret[i]-std_regret[i], mean_regret[i]+std_regret[i], color=c, alpha=0.2)
         if log:
             plt.yscale("log")
     plt.grid(color="grey", linestyle="--", linewidth=0.5)
@@ -163,7 +166,7 @@ def storeRegret(models, methods, param_dic, n_expe, T):
     final_regrets = np.zeros((len(methods), n_expe))
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
     for j in tqdm(range(n_expe)):
-        np.random.seed(2022+j)
+        # np.random.seed(2022+j)
         model = models[j]
         for i, m in enumerate(methods):
             alg = model.__getattribute__(m)
@@ -187,9 +190,13 @@ def storeRegret(models, methods, param_dic, n_expe, T):
                 final_regrets[j, :].mean(),
                 final_regrets[j, :].std(),
             )
+    min_regret = all_regrets.min(axis=1)
+    max_regret = all_regrets.max(axis=1)
     std_regret = all_regrets.std(axis=1)
     mean_regret = all_regrets.mean(axis=1)
     results = {
+        "min_regret": min_regret,
+        "max_regret": max_regret,
         "std_regret": std_regret,
         "mean_regret": mean_regret,
         "all_regrets": all_regrets,

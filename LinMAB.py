@@ -235,7 +235,7 @@ class HyperLinear(nn.Module):
     def get_theta(self, z):
         theta = self.hypermodel(z)
         prior_theta = self.priormodel(z)
-        theta = self.posterior_scale * theta + self.prior_scale  + prior_theta
+        theta = self.posterior_scale * theta + self.prior_scale * prior_theta
         return theta
 
     def regularization(self, z):
@@ -243,33 +243,7 @@ class HyperLinear(nn.Module):
         reg_loss = theta.pow(2).mean()
         return reg_loss
 
-class ReplayBuffer():
-    def __init__(self, buffer_limit, noise_dim=32):
-        self.buffer = collections.deque(maxlen=buffer_limit)
-        self.noise_dim = noise_dim
-
-    def _unit_sphere_noise(self):
-        noise = np.random.randn(1, self.noise_dim).astype(np.float32)
-        noise /= np.linalg.norm(noise, axis=1)
-        return noise
-
-    def put(self, transition):
-        target_z = self._unit_sphere_noise()
-        transition += (target_z, )
-        self.buffer.append(transition)
-
-    def sample(self, n):
-        buffer_size = len(self.buffer)
-        batch_index = np.random.randint(low=0, high=buffer_size, size=n)
-        f_list, r_list, z_list = [], [], []
-        for index in batch_index:
-            f, r, z = self.buffer[index]
-            f_list.append(f)
-            r_list.append(r)
-            z_list.append(z)
-        return np.array(f_list), np.array(r_list), np.array(z_list)
-
-class ReplayBufferV2():
+class ReplayBuffer:
     def __init__(self, noise_dim=32):
         self.f_list = []
         self.r_list = []
@@ -293,6 +267,13 @@ class ReplayBufferV2():
         index = list(range(sample_num))
         if shuffle:
             np.random.shuffle(index)
+        f_data, r_data, z_data = np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
+        f_data, r_data, z_data = f_data[index], r_data[index], z_data[index]
+        return f_data, r_data, z_data
+
+    def sample(self, n):
+        sample_num = len(self.f_list)
+        index = np.random.randint(low=0, high=sample_num, size=n)
         f_data, r_data, z_data = np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
         f_data, r_data, z_data = f_data[index], r_data[index], z_data[index]
         return f_data, r_data, z_data
@@ -331,8 +312,8 @@ class HyperModel():
             self.prior_std, self.prior_mean,
             self.prior_scale, self.posterior_scale
         ).to(self.device) # init hypermodel
-        # self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer
-        self.optim = torch.optim.SGD(self.model.parameters(), lr=self.lr) # init optimizer
+        self.optim = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer
+        # self.optim = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9) # init optimizer
 
     def update(self, f_batch, r_batch, z_batch, sample_num):
         batch_size = f_batch.shape[0]
@@ -441,7 +422,7 @@ class LinMAB:
         target_noise_coef = self.eta
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
-        buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
+        buffer = ReplayBuffer(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         for t in range(T):
@@ -469,7 +450,7 @@ class LinMAB:
         target_noise_coef = self.eta
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
-        buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
+        buffer = ReplayBuffer(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         for t in range(T):
@@ -756,7 +737,7 @@ class LinMAB:
         target_noise_coef = self.eta
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
-        buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
+        buffer = ReplayBuffer(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
@@ -788,7 +769,7 @@ class LinMAB:
         target_noise_coef = self.eta
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
-        buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
+        buffer = ReplayBuffer(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
@@ -860,7 +841,7 @@ class LinMAB:
         target_noise_coef = self.eta
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
-        buffer = ReplayBuffer(buffer_limit=T, noise_dim=noise_dim) # init replay buffer
+        buffer = ReplayBuffer(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
@@ -892,7 +873,7 @@ class LinMAB:
         target_noise_coef = self.eta
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(noise_dim, self.d, prior_std=self.prior_sigma, lr=lr, target_noise_coef=target_noise_coef, norm_coef=norm_coef)
-        buffer = ReplayBufferV2(noise_dim=noise_dim) # init replay buffer
+        buffer = ReplayBuffer(noise_dim=noise_dim) # init replay buffer
 
         arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)

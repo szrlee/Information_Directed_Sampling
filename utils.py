@@ -166,7 +166,7 @@ def storeRegret(models, methods, param_dic, n_expe, T):
     final_regrets = np.zeros((len(methods), n_expe))
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
     for j in tqdm(range(n_expe)):
-        # np.random.seed(2022+j)
+        np.random.seed(2022)
         model = models[j]
         for i, m in enumerate(methods):
             alg = model.__getattribute__(m)

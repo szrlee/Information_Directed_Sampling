@@ -254,8 +254,8 @@ class ReplayBuffer:
         return self.sample_num
 
     def _unit_sphere_noise(self):
-        noise = np.random.randn(1, self.noise_dim).astype(np.float32)
-        noise /= np.linalg.norm(noise, axis=1)
+        noise = np.random.randn(self.noise_dim).astype(np.float32)
+        noise /= np.linalg.norm(noise)
         return noise
 
     def put(self, transition):
@@ -290,6 +290,7 @@ class HyperModel:
         prior_scale: float = 1.0,
         posterior_scale: float = 1.0,
         lr: float = 0.01,
+        fg_lambda: float = 1.0,
         batch_size: int = 32,
         optim: str = 'Adam',
         norm_coef: float = 0.01,
@@ -304,6 +305,7 @@ class HyperModel:
         self.prior_scale = prior_scale
         self.posterior_scale = posterior_scale
         self.lr = lr
+        self.fg_lambda = fg_lambda
         self.batch_size = batch_size
         self.optim = optim
         self.norm_coef = norm_coef
@@ -333,37 +335,40 @@ class HyperModel:
     def put(self, transition):
         self.buffer.put(transition)
 
-    def _update(self):
+    def _update(self, features):
         f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
-        self.learn(f_batch, r_batch, z_batch)
+        self.learn(f_batch, r_batch, z_batch, features)
 
-    def _update_reset(self):
+    def _update_reset(self, features):
         sample_num = len(self.buffer)
         if sample_num > self.batch_size:
             f_data, r_data, z_data = self.buffer.get()
             for i in range(0, self.batch_size, sample_num):
                 f_batch, r_batch, z_batch = f_data[i:i+self.batch_size], r_data[i: i+self.batch_size], z_data[i:i+self.batch_size]
-                self.learn(f_batch, r_batch, z_batch)
+                self.learn(f_batch, r_batch, z_batch, features)
             if sample_num % self.batch_size !=0:
                 last_sample = sample_num % self.batch_size
                 index1 = -np.arange(1, last_sample + 1).astype(np.int32)
                 index2 = np.random.randint(low=0, high=sample_num, size=self.batch_size-last_sample)
                 index = np.hstack([index1, index2])
                 f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
-                self.learn(f_batch, r_batch, z_batch)
+                self.learn(f_batch, r_batch, z_batch, features)
         else:
             f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
-            self.learn(f_batch, r_batch, z_batch)
+            self.learn(f_batch, r_batch, z_batch, features)
 
-    def learn(self, f_batch, r_batch, z_batch):
+    def learn(self, f_batch, r_batch, z_batch, features):
         z_batch = torch.FloatTensor(z_batch).to(self.device)
         f_batch = torch.FloatTensor(f_batch).to(self.device)
         r_batch = torch.FloatTensor(r_batch).to(self.device)
+        features = torch.FloatTensor(features).to(self.device)
         update_noise = self.generate_noise(self.batch_size) # sample noise for update
         target_noise = torch.mul(z_batch, update_noise).sum(-1) * self.target_noise_coef # noise for target
+        theta = self.model.get_theta(update_noise)
+        fg_term = torch.mm(theta, features.T).max(dim=-1)[0]
         predict = self.model(f_batch, update_noise)
         diff = target_noise + r_batch - predict
-        loss = diff.pow(2).mean()
+        loss = (diff.pow(2) - self.fg_lambda * fg_term).mean()
         reg_loss = self.model.regularization(update_noise) * (self.norm_coef / len(self.buffer))
         loss += reg_loss
         self.optimizer.zero_grad()
@@ -451,7 +456,7 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def TS_hyper(self, T, noise_dim=2, lr=0.01, batch_size=32, optim='Adam', update_num=2):
+    def TS_hyper(self, T, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
@@ -460,7 +465,7 @@ class LinMAB:
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(
             noise_dim, self.d, prior_std=self.prior_sigma,
-            lr=lr, batch_size=batch_size, optim=optim,
+            fg_lambda=fg_lambda, lr=lr, batch_size=batch_size, optim=optim,
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
@@ -477,10 +482,10 @@ class LinMAB:
             model.put((f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
-                model.update()
+                model.update(self.features)
         return reward, arm_sequence
 
-    def TS_hyper_reset(self, T, noise_dim=2, lr=0.01, batch_size=32, optim='Adam', update_num=1):
+    def TS_hyper_reset(self, T, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
@@ -489,7 +494,7 @@ class LinMAB:
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(
             noise_dim, self.d, prior_std=self.prior_sigma,
-            lr=lr, batch_size=batch_size, optim=optim,
+            fg_lambda=fg_lambda, lr=lr, batch_size=batch_size, optim=optim,
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
@@ -507,7 +512,7 @@ class LinMAB:
             # update hypermodel
             model.reset()
             for _ in range(update_num):
-                model.update()
+                model.update(self.features)
         return reward, arm_sequence
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
@@ -751,7 +756,7 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def VIDS_sample_hyper(self, T, M=10000, noise_dim=2, lr=0.01, batch_size=32, optim='Adam', update_num=2):
+    def VIDS_sample_hyper(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -762,7 +767,7 @@ class LinMAB:
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(
             noise_dim, self.d, prior_std=self.prior_sigma,
-            lr=lr, batch_size=batch_size, optim=optim,
+            fg_lambda=fg_lambda, lr=lr, batch_size=batch_size, optim=optim,
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
@@ -781,10 +786,10 @@ class LinMAB:
             model.put((f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
-                model.update()
+                model.update(self.features)
         return reward, arm_sequence
 
-    def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=2, lr=0.01, batch_size=32, optim='Adam', update_num=1):
+    def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -795,7 +800,7 @@ class LinMAB:
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(
             noise_dim, self.d, prior_std=self.prior_sigma,
-            lr=lr, batch_size=batch_size, optim=optim,
+            fg_lambda=fg_lambda, lr=lr, batch_size=batch_size, optim=optim,
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
@@ -815,7 +820,7 @@ class LinMAB:
             # update hypermodel
             model.reset()
             for _ in range(update_num):
-                model.update()
+                model.update(self.features)
         return reward, arm_sequence
 
     def VIDS_sample_solution(self, T, M=10000):
@@ -842,7 +847,7 @@ class LinMAB:
             reward[t], arm_sequence[t] = r_t, a_t
         return reward, arm_sequence
 
-    def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=2, lr=0.01, batch_size=32, optim='Adam', update_num=2):
+    def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -853,7 +858,7 @@ class LinMAB:
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(
             noise_dim, self.d, prior_std=self.prior_sigma,
-            lr=lr, batch_size=batch_size, optim=optim,
+            fg_lambda=fg_lambda, lr=lr, batch_size=batch_size, optim=optim,
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
@@ -872,10 +877,10 @@ class LinMAB:
             model.put((f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
-                model.update()
+                model.update(self.features)
         return reward, arm_sequence
 
-    def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=2, lr=0.01, batch_size=32, optim='Adam', update_num=1):
+    def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
         Implementation of V-IDS with hypermodel for Linear Bandits with multivariate
         normal prior
@@ -886,7 +891,7 @@ class LinMAB:
         norm_coef = (self.eta / self.prior_sigma)**2
         model = HyperModel(
             noise_dim, self.d, prior_std=self.prior_sigma,
-            lr=lr, batch_size=batch_size, optim=optim,
+            fg_lambda=fg_lambda, lr=lr, batch_size=batch_size, optim=optim,
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
@@ -906,7 +911,7 @@ class LinMAB:
             # update hypermodel
             model.reset()
             for _ in range(update_num):
-                model.update()
+                model.update(self.features)
         return reward, arm_sequence
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):

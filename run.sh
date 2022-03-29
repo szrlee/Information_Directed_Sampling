@@ -1,7 +1,7 @@
 export CUDA_VISIBLE_DEVICES=$1
 game=$2
 
-lr=0.01
+lr=0.001
 noise_dim=2
 batch_size=32
 update_num=100

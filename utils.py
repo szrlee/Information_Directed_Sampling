@@ -21,54 +21,66 @@ cmap = {
     9: "cyan",
 }
 
+# mapping_methods_labels = {
+#     "KG": "KG",
+#     "Approx_KG_star": "Approximate KG*",
+#     "KG_star": "KG*",
+#     "IDS": "Exact IDS",
+#     "TS": "TS - Conjugacy",
+#     "TS_hyper": "TS - HyperModel",
+#     "TS_hyper_reset": "TS - HyperModel Reset",
+#     "TS_SGMCMC": "TS - SGMCMC" ,
+#     "FGTS": "Feel-Good TS - SGMCMC-FG_1e0",
+#     "FGTS01": "Feel-Good TS - SGMCMC-FG_1e-1",
+#     "BayesUCB": "Bayes UCB",
+#     "UCB_Tuned": "Tuned UCB",
+#     "LinUCB": "Linear UCB",
+#     "MOSS": "MOSS",
+#     "GPUCB": "GP-UCB",
+#     "Tuned_GPUCB": "Tuned GP-UCB",
+#     "VIDS_approx": "Grid V-IDS",
+#     "VIDS_sample": "Sample V-IDS - D Conjugacy",
+#     "VIDS_sample_hyper": "Sample V-IDS - D HyperModel",
+#     "VIDS_sample_hyper_reset": "Sample V-IDS - D HyperModel Reset",
+#     "VIDS_sample_solution": "Sample V-IDS - P Conjugacy",
+#     "VIDS_sample_solution_hyper": "Sample V-IDS - P HyperModel",
+#     "VIDS_sample_solution_hyper_reset": "Sample V-IDS - P HyperModel Reset",
+#     "VIDS_sample_sgmcmc": "Sample V-IDS - SGMCMC",
+#     "VIDS_sample_sgmcmc_fg": "Sample V-IDS - SGMCMC-FG_1e0",
+#     "VIDS_sample_sgmcmc_fg01": "Sample V-IDS - SGMCMC-FG_1e-1",
+#     "IDS_approx": "Grid IDS",
+#     "IDS_sample": "Sample IDS",
+#     "UCB1": "UCB1",
+# }
+
 mapping_methods_labels = {
-    "KG": "KG",
-    "Approx_KG_star": "Approximate KG*",
-    "KG_star": "KG*",
-    "IDS": "Exact IDS",
     "TS": "TS - Conjugacy",
-    "TS_hyper": "TS - HyperModel",
-    "TS_hyper_reset": "TS - HyperModel Reset",
-    "TS_SGMCMC": "TS - SGMCMC" ,
-    "FGTS": "Feel-Good TS - SGMCMC-FG_1e0",
-    "FGTS01": "Feel-Good TS - SGMCMC-FG_1e-1",
-    "BayesUCB": "Bayes UCB",
-    "UCB_Tuned": "Tuned UCB",
-    "LinUCB": "Linear UCB",
-    "MOSS": "MOSS",
-    "GPUCB": "GP-UCB",
-    "Tuned_GPUCB": "Tuned GP-UCB",
-    "VIDS_approx": "Grid V-IDS",
+    "TS_hyper:0": "TS - HyperModel",
+    "TS_hyper:1": "TS - HyperModel FG 1.0",
+    "TS_hyper:2": "TS - HyperModel FG 0.1",
     "VIDS_sample": "Sample V-IDS - D Conjugacy",
-    "VIDS_sample_hyper": "Sample V-IDS - D HyperModel",
-    "VIDS_sample_hyper_reset": "Sample V-IDS - D HyperModel Reset",
+    "VIDS_sample_hyper:0": "Sample V-IDS - D HyperModel",
+    "VIDS_sample_hyper:1": "Sample V-IDS - D HyperModel FG 1.0",
+    "VIDS_sample_hyper:2": "Sample V-IDS - D HyperModel FG 0.1",
     "VIDS_sample_solution": "Sample V-IDS - P Conjugacy",
-    "VIDS_sample_solution_hyper": "Sample V-IDS - P HyperModel",
-    "VIDS_sample_solution_hyper_reset": "Sample V-IDS - P HyperModel Reset",
-    "VIDS_sample_sgmcmc": "Sample V-IDS - SGMCMC",
-    "VIDS_sample_sgmcmc_fg": "Sample V-IDS - SGMCMC-FG_1e0",
-    "VIDS_sample_sgmcmc_fg01": "Sample V-IDS - SGMCMC-FG_1e-1",
-    "IDS_approx": "Grid IDS",
-    "IDS_sample": "Sample IDS",
-    "UCB1": "UCB1",
+    "VIDS_sample_solution_hyper:0": "Sample V-IDS - P HyperModel",
+    "VIDS_sample_solution_hyper:1": "Sample V-IDS - P HyperModel FG 1.0",
+    "VIDS_sample_solution_hyper:2": "Sample V-IDS - P HyperModel FG 0.1",
 }
 
 mapping_methods_colors = {
-    "TS": "yellow",
-    "TS_hyper": "tan",
-    "TS_hyper_reset": "darkkhaki",
-    "TS_SGMCMC": "orchid",
-    "FGTS": "green",
-    "FGTS01": "chartreuse",
-    "VIDS_sample": "blue",
-    "VIDS_sample_hyper": "green",
-    "VIDS_sample_hyper_reset": "cyan",
-    "VIDS_sample_solution": "red",
-    "VIDS_sample_solution_hyper": "chocolate",
-    "VIDS_sample_solution_hyper_reset": "slateblue",
-    "VIDS_sample_sgmcmc": "brown",
-    "VIDS_sample_sgmcmc_fg": "red",
-    "VIDS_sample_sgmcmc_fg01": "black",
+    "TS": "black",
+    "TS_hyper:0": "dimgray",
+    "TS_hyper:1": "darkgray",
+    "TS_hyper:2": "lightgray",
+    "VIDS_sample": "red",
+    "VIDS_sample_hyper:0": "darksalmon",
+    "VIDS_sample_hyper:1": "sienna",
+    "VIDS_sample_hyper:2": "maroon",
+    "VIDS_sample_solution": "gold",
+    "VIDS_sample_solution_hyper:0": "darkkhaki",
+    "VIDS_sample_solution_hyper:1": "yellowgreen",
+    "VIDS_sample_solution_hyper:2": "darkcyan",
 }
 
 # mapping_methods_colors = {
@@ -169,7 +181,8 @@ def storeRegret(models, methods, param_dic, n_expe, T):
         np.random.seed(2022)
         model = models[j]
         for i, m in enumerate(methods):
-            alg = model.__getattribute__(m)
+            alg_name = m.split(':')[0]
+            alg = model.__getattribute__(alg_name)
             args = inspect.getfullargspec(alg)[0][2:]
             args = [T] + [param_dic[m][i] for i in args]
             # all_regrets[i, j, :] = model.regret(alg(*args)[0], T)

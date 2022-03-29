@@ -31,8 +31,8 @@ from datetime import datetime
 def get_args():
     parser = argparse.ArgumentParser()
     # environment config
-    parser.add_argument('--game', type=str, default='FreqRusso')
-    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--game', type=str, default='Zhang')
+    parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--noise_dim', type=int, default=2)
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--update-num', type=int, default=100)
@@ -63,14 +63,20 @@ param = {
     "IDS": {"M": 1000},
     "IDS_approx": {"N": 1000, "display_results": False},
     "IDS_sample": {"M": 10000, "VIDS": False}, # The parameter VIDS is only reserved for Bernoulli MAB
-    "TS_hyper": hyper_params,
+    "TS_hyper:0": {'fg_lambda':0.0, **hyper_params},
+    "TS_hyper:1": {'fg_lambda':1.0, **hyper_params},
+    "TS_hyper:2": {'fg_lambda':0.1, **hyper_params},
     "TS_hyper_reset": hyper_reset_params,
     "VIDS_approx": {"rg": 10.0, "N": 1000},
     "VIDS_sample": {"M": 10000, "VIDS": True}, # The parameter VIDS is only reserved for Bernoulli MAB
-    "VIDS_sample_hyper": {"M": 10000, **hyper_params},
+    "VIDS_sample_hyper:0": {"M": 10000, 'fg_lambda':0.0, **hyper_params},
+    "VIDS_sample_hyper:1": {"M": 10000, 'fg_lambda':1.0, **hyper_params},
+    "VIDS_sample_hyper:2": {"M": 10000, 'fg_lambda':0.1, **hyper_params},
     "VIDS_sample_hyper_reset": {"M": 10000, **hyper_reset_params},
     "VIDS_sample_solution": {"M": 10000, "VIDS": True},
-    "VIDS_sample_solution_hyper": {"M": 10000, **hyper_params},
+    "VIDS_sample_solution_hyper:0": {"M": 10000, 'fg_lambda':0.0, **hyper_params},
+    "VIDS_sample_solution_hyper:1": {"M": 10000, 'fg_lambda':1.0, **hyper_params},
+    "VIDS_sample_solution_hyper:2": {"M": 10000, 'fg_lambda':0.1, **hyper_params},
     "VIDS_sample_solution_hyper_reset": {"M": 10000, **hyper_reset_params},
     "FGTS": {"fg_lambda": 1},
     "VIDS_sample_sgmcmc": {"M": 10000},
@@ -80,14 +86,17 @@ param = {
 
 linear_methods = [
     "TS",
-    "TS_hyper",
-    "TS_hyper_reset",
+    "TS_hyper:0",
+    # "TS_hyper:1",
+    # "TS_hyper:2",
     "VIDS_sample",
-    "VIDS_sample_hyper",
-    "VIDS_sample_hyper_reset",
+    "VIDS_sample_hyper:0",
+    # "VIDS_sample_hyper:1",
+    # "VIDS_sample_hyper:2",
     "VIDS_sample_solution",
-    "VIDS_sample_solution_hyper",
-    "VIDS_sample_solution_hyper_reset",
+    "VIDS_sample_solution_hyper:0",
+    # "VIDS_sample_solution_hyper:1",
+    # "VIDS_sample_solution_hyper:2",
 ]
 
 game_config = {
@@ -99,7 +108,11 @@ game_config = {
 
 with open(os.path.join(path, "config.json"), "wt") as f:
     methods_param = {method : param.get(method, '') for method in linear_methods}
-    f.write(json.dumps({'methods_param': methods_param, 'game_config': game_config[game], 'user_config': vars(args)}, indent=4) + '\n')
+    f.write(json.dumps(
+        {
+            'methods_param': methods_param, 'game_config': game_config[game], 'user_config': vars(args),
+            'methods': linear_methods, 'labels': utils.mapping_methods_labels, 'colors': utils.mapping_methods_colors,
+        }, indent=4) + '\n')
     f.flush()
     f.close()
 

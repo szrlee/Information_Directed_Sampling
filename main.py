@@ -31,7 +31,7 @@ from datetime import datetime
 def get_args():
     parser = argparse.ArgumentParser()
     # environment config
-    parser.add_argument('--game', type=str, default='Zhang')
+    parser.add_argument('--game', type=str, default='Russo')
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--noise_dim', type=int, default=2)
     parser.add_argument('--batch-size', type=int, default=32)
@@ -39,7 +39,7 @@ def get_args():
     parser.add_argument('--repeat-num', type=int, default=500)
     parser.add_argument('--time-period', type=int, default=200)
     parser.add_argument('--n-expe', type=int, default=20)
-    parser.add_argument('--n-context', type=int, default=20)
+    parser.add_argument('--n-context', type=int, default=0)
     parser.add_argument('--optim', type=str, default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--norm-noise', type=int, default=0, choices=[0, 1])
     args = parser.parse_known_args()[0]
@@ -138,7 +138,17 @@ if args.n_context > 0:
         problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
         **game_config[game]
     )
-
+elif args.n_context < 0:
+        lin = exp.InfiniteContextLinMAB_expe(
+        n_expe=args.n_expe,
+        methods=linear_methods,
+        param_dic=param,
+        labels=labels,
+        colors=colors,
+        path=path,
+        problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
+        **game_config[game]
+    )
 else:
     lin = exp.LinMAB_expe(
         n_expe=args.n_expe,

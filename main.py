@@ -39,6 +39,7 @@ def get_args():
     parser.add_argument('--repeat-num', type=int, default=500)
     parser.add_argument('--time-period', type=int, default=200)
     parser.add_argument('--n-expe', type=int, default=20)
+    parser.add_argument('--n-context', type=int, default=20)
     parser.add_argument('--optim', type=str, default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--norm-noise', type=int, default=0, choices=[0, 1])
     args = parser.parse_known_args()[0]
@@ -125,19 +126,30 @@ check_time = False
 # %%
 # Regret
 labels, colors = utils.labelColor(linear_methods)
-lin = exp.LinMAB_expe(
-    n_expe=args.n_expe,
-    # n_features=100,
-    # n_arms=10,
-    # T=200,
-    methods=linear_methods,
-    param_dic=param,
-    labels=labels,
-    colors=colors,
-    path=path,
-    problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
-    **game_config[game]
-)
+if args.n_context > 0:
+    lin = exp.FiniteContextLinMAB_expe(
+        n_expe=args.n_expe,
+        n_context=args.n_context,
+        methods=linear_methods,
+        param_dic=param,
+        labels=labels,
+        colors=colors,
+        path=path,
+        problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
+        **game_config[game]
+    )
+
+else:
+    lin = exp.LinMAB_expe(
+        n_expe=args.n_expe,
+        methods=linear_methods,
+        param_dic=param,
+        labels=labels,
+        colors=colors,
+        path=path,
+        problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
+        **game_config[game]
+    )
 
 if store:
     pkl.dump(lin, open(os.path.join(path, "results.pkl"), "wb"))

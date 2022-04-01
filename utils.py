@@ -1,5 +1,6 @@
 """ Packages import """
 import numpy as np
+import torch
 
 # import jax.numpy as np
 
@@ -70,15 +71,15 @@ mapping_methods_labels = {
 
 mapping_methods_colors = {
     "TS": "black",
-    "TS_hyper:0": "dimgray",
+    "TS_hyper:0": "green",
     "TS_hyper:1": "darkgray",
     "TS_hyper:2": "lightgray",
     "VIDS_sample": "red",
-    "VIDS_sample_hyper:0": "darksalmon",
+    "VIDS_sample_hyper:0": "blue",
     "VIDS_sample_hyper:1": "sienna",
     "VIDS_sample_hyper:2": "maroon",
     "VIDS_sample_solution": "gold",
-    "VIDS_sample_solution_hyper:0": "darkkhaki",
+    "VIDS_sample_solution_hyper:0": "purple",
     "VIDS_sample_solution_hyper:1": "yellowgreen",
     "VIDS_sample_solution_hyper:2": "darkcyan",
 }
@@ -145,15 +146,11 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     :param colors: list, list of colors for the different curves
     :param title: string, plot's title
     """
-    mean_regret, std_regret = regret['mean_regret'], regret['std_regret']
-    max_regret, min_regret = regret['max_regret'], regret['min_regret']
+    mean_regret = regret['mean_regret']
     plt.rcParams["figure.figsize"] = (8, 6)
     for i, l in enumerate(labels):
         c = cmap[i] if not colors else colors[i]
-        x = np.arange(len(mean_regret[i]))
-        plt.plot(x, mean_regret[i], c=c, label=l)
-        # plt.fill_between(x, min_regret[i], max_regret[i], color=c, alpha=0.2)
-        # plt.fill_between(x, mean_regret[i]-std_regret[i], mean_regret[i]+std_regret[i], color=c, alpha=0.2)
+        plt.plot(mean_regret[i], c=c, label=l)
         if log:
             plt.yscale("log")
     plt.grid(color="grey", linestyle="--", linewidth=0.5)
@@ -162,7 +159,6 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     plt.xlabel("Time period")
     plt.legend(loc='best')
     plt.savefig(path+"/regret.pdf")
-
 
 def storeRegret(models, methods, param_dic, n_expe, T):
     """
@@ -177,24 +173,17 @@ def storeRegret(models, methods, param_dic, n_expe, T):
     all_regrets = np.zeros((len(methods), n_expe, T))
     final_regrets = np.zeros((len(methods), n_expe))
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
-    for j in tqdm(range(n_expe)):
-        np.random.seed(2022)
-        model = models[j]
-        for i, m in enumerate(methods):
-            alg_name = m.split(':')[0]
+    for i, m in enumerate(methods):
+        set_seed(2022)
+        alg_name = m.split(':')[0]
+        for j in tqdm(range(n_expe)):
+            model = models[j]
             alg = model.__getattribute__(alg_name)
             args = inspect.getfullargspec(alg)[0][2:]
             args = [T] + [param_dic[m][i] for i in args]
             # all_regrets[i, j, :] = model.regret(alg(*args)[0], T)
             all_regrets[i, j, :] = model.expect_regret(alg(*args)[1], T)
-        print({m: round(all_regrets[i, j, -1], 1) for i, m in enumerate(methods)})
-        print(
-            {
-                m + "_bar": np.mean(all_regrets[i, : (j + 1), -1])
-                for i, m in enumerate(methods)
-            }
-        )
-
+        print(f"{alg_name}: {np.mean(all_regrets[i], axis=0)[-1]}")
     for j, m in enumerate(methods):
         for i in range(n_expe):
             final_regrets[j, i] = all_regrets[j, i, -1]
@@ -291,3 +280,9 @@ def build_bernoulli_finite_set(L, K):
     q[:, :, 0] = np.random.uniform(size=L * K).reshape((L, K))
     q[:, :, 1] = 1 - q[:, :, 0]
     return p, q, r
+
+
+def set_seed(seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    rd.seed(seed)

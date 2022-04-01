@@ -1,6 +1,5 @@
 # %%
 """ Packages import """
-import torch
 import json
 import argparse
 import os
@@ -126,40 +125,22 @@ check_time = False
 # %%
 # Regret
 labels, colors = utils.labelColor(linear_methods)
+expe_params = {
+    'n_expe': args.n_expe,
+    'methods': linear_methods,
+    'param_dic': param,
+    'labels': labels,
+    'colors': colors,
+    'path': path,
+    'problem': game,
+    **game_config[game]
+}
 if args.n_context > 0:
-    lin = exp.FiniteContextLinMAB_expe(
-        n_expe=args.n_expe,
-        n_context=args.n_context,
-        methods=linear_methods,
-        param_dic=param,
-        labels=labels,
-        colors=colors,
-        path=path,
-        problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
-        **game_config[game]
-    )
+    lin = exp.FiniteContextLinMAB_expe(n_context=args.n_context, **expe_params)
 elif args.n_context < 0:
-        lin = exp.InfiniteContextLinMAB_expe(
-        n_expe=args.n_expe,
-        methods=linear_methods,
-        param_dic=param,
-        labels=labels,
-        colors=colors,
-        path=path,
-        problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
-        **game_config[game]
-    )
+    lin = exp.InfiniteContextLinMAB_expe(**expe_params)
 else:
-    lin = exp.LinMAB_expe(
-        n_expe=args.n_expe,
-        methods=linear_methods,
-        param_dic=param,
-        labels=labels,
-        colors=colors,
-        path=path,
-        problem=game,  # choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
-        **game_config[game]
-    )
+    lin = exp.LinMAB_expe(**expe_params)
 
 if store:
     pkl.dump(lin, open(os.path.join(path, "results.pkl"), "wb"))

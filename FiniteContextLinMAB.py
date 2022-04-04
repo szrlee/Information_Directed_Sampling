@@ -250,6 +250,7 @@ class ReplayBuffer:
         self.f_list = []
         self.r_list = []
         self.z_list = []
+        self.s_list = []
         self.noise_dim = noise_dim
         self.sample_num = 0
 
@@ -262,8 +263,9 @@ class ReplayBuffer:
         return noise
 
     def put(self, transition):
-        f, r = transition
+        s, f, r = transition
         z = self._unit_sphere_noise()
+        self.s_list.append(s)
         self.f_list.append(f)
         self.r_list.append(r)
         self.z_list.append(z)
@@ -273,15 +275,19 @@ class ReplayBuffer:
         index = list(range(self.sample_num))
         if shuffle:
             np.random.shuffle(index)
-        f_data, r_data, z_data = np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
-        f_data, r_data, z_data = f_data[index], r_data[index], z_data[index]
-        return f_data, r_data, z_data
+        s_data, f_data, r_data, z_data \
+            = np.array(self.s_list), np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
+        s_data, f_data, r_data, z_data \
+            = s_data[index], f_data[index], r_data[index], z_data[index]
+        return s_data, f_data, r_data, z_data
 
     def sample(self, n):
         index = np.random.randint(low=0, high=self.sample_num, size=n)
-        f_data, r_data, z_data = np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
-        f_data, r_data, z_data = f_data[index], r_data[index], z_data[index]
-        return f_data, r_data, z_data
+        s_data, f_data, r_data, z_data \
+            = np.array(self.s_list), np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
+        s_data, f_data, r_data, z_data \
+            = s_data[index], f_data[index], r_data[index], z_data[index]
+        return s_data, f_data, r_data, z_data
 
 
 class HyperModel:
@@ -340,8 +346,8 @@ class HyperModel:
         self.buffer.put(transition)
 
     def _update(self, features):
-        f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
-        self.learn(f_batch, r_batch, z_batch, features)
+        s_batch, f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
+        self.learn(s_batch, f_batch, r_batch, z_batch, features)
 
     def _update_reset(self, features):
         sample_num = len(self.buffer)
@@ -361,15 +367,15 @@ class HyperModel:
             f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
             self.learn(f_batch, r_batch, z_batch, features)
 
-    def learn(self, f_batch, r_batch, z_batch, features):
+    def learn(self, s_batch, f_batch, r_batch, z_batch):
         z_batch = torch.FloatTensor(z_batch).to(self.device)
         f_batch = torch.FloatTensor(f_batch).to(self.device)
         r_batch = torch.FloatTensor(r_batch).to(self.device)
-        features = torch.FloatTensor(features).to(self.device)
+        s_batch = torch.FloatTensor(s_batch).to(self.device)
         update_noise = self.generate_noise(self.batch_size) # sample noise for update
         target_noise = torch.mul(z_batch, update_noise).sum(-1) * self.target_noise_coef # noise for target
         theta = self.model.get_theta(update_noise)
-        fg_term = torch.mm(theta, features.T).max(dim=-1)[0]
+        fg_term = torch.einsum('bd,bad -> ba', theta, s_batch).max(dim=-1)[0]
         predict = self.model(f_batch, update_noise)
         diff = target_noise + r_batch - predict
         loss = (diff.pow(2) - self.fg_lambda * fg_term).mean()
@@ -490,10 +496,10 @@ class FiniteContextLinMAB:
             a_t = rd_argmax(np.dot(self.features, theta_t))
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
-            model.put((f_t, r_t))
+            model.put((self.features, f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
-                model.update(self.features)
+                model.update()
         return reward, (arm_sequence, context_sequence)
 
     def TS_hyper_reset(self, T, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
@@ -520,11 +526,11 @@ class FiniteContextLinMAB:
             a_t = rd_argmax(np.dot(self.features, theta_t))
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
-            model.put((f_t, r_t))
+            model.put((self.features, f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
-                model.update(self.features)
+                model.update()
         return reward, (arm_sequence, context_sequence)
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
@@ -797,10 +803,10 @@ class FiniteContextLinMAB:
                 a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
-            model.put((f_t, r_t))
+            model.put((self.features, f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
-                model.update(self.features)
+                model.update()
         return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
@@ -831,11 +837,11 @@ class FiniteContextLinMAB:
                 a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
-            model.put((f_t, r_t))
+            model.put((self.features, f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
-                model.update(self.features)
+                model.update()
         return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_solution(self, T, M=10000):
@@ -891,10 +897,10 @@ class FiniteContextLinMAB:
                 a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
-            model.put((f_t, r_t))
+            model.put((self.features, f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
-                model.update(self.features)
+                model.update()
         return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
@@ -925,11 +931,11 @@ class FiniteContextLinMAB:
                 a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
-            model.put((f_t, r_t))
+            model.put((self.features, f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
-                model.update(self.features)
+                model.update()
         return reward, (arm_sequence, context_sequence)
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):

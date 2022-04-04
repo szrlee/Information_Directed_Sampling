@@ -345,27 +345,28 @@ class HyperModel:
     def put(self, transition):
         self.buffer.put(transition)
 
-    def _update(self, features):
+    def _update(self):
         s_batch, f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
-        self.learn(s_batch, f_batch, r_batch, z_batch, features)
+        self.learn(s_batch, f_batch, r_batch, z_batch)
 
-    def _update_reset(self, features):
+    def _update_reset(self):
         sample_num = len(self.buffer)
         if sample_num > self.batch_size:
-            f_data, r_data, z_data = self.buffer.get()
+            s_data, f_data, r_data, z_data = self.buffer.get()
             for i in range(0, self.batch_size, sample_num):
-                f_batch, r_batch, z_batch = f_data[i:i+self.batch_size], r_data[i: i+self.batch_size], z_data[i:i+self.batch_size]
-                self.learn(f_batch, r_batch, z_batch, features)
+                s_batch, f_batch, r_batch, z_batch \
+                    = s_data[i:i+self.batch_size], f_data[i:i+self.batch_size], r_data[i: i+self.batch_size], z_data[i:i+self.batch_size]
+                self.learn(s_batch, f_batch, r_batch, z_batch)
             if sample_num % self.batch_size !=0:
                 last_sample = sample_num % self.batch_size
                 index1 = -np.arange(1, last_sample + 1).astype(np.int32)
                 index2 = np.random.randint(low=0, high=sample_num, size=self.batch_size-last_sample)
                 index = np.hstack([index1, index2])
-                f_batch, r_batch, z_batch = f_data[index], r_data[index], z_data[index]
-                self.learn(f_batch, r_batch, z_batch, features)
+                s_batch, f_batch, r_batch, z_batch = s_data[index], f_data[index], r_data[index], z_data[index]
+                self.learn(s_batch, f_batch, r_batch, z_batch)
         else:
-            f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
-            self.learn(f_batch, r_batch, z_batch, features)
+            s_batch, f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
+            self.learn(s_batch, f_batch, r_batch, z_batch)
 
     def learn(self, s_batch, f_batch, r_batch, z_batch):
         z_batch = torch.FloatTensor(z_batch).to(self.device)

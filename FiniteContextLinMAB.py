@@ -41,6 +41,7 @@ class ArmGaussianLinear(object):
     def set_context(self):
         context = np.random.randint(self.n_context)
         self.features = self.all_features[context]
+        return context
 
     def regret(self, reward, T):
         """
@@ -52,16 +53,17 @@ class ArmGaussianLinear(object):
         best_arm_reward = np.max(np.dot(self.features, self.real_theta))
         return best_arm_reward * np.arange(1, T + 1) - np.cumsum(reward)
 
-    def expect_regret(self, arm_sequence, T):
+    def expect_regret(self, arm_context_sequence, T):
         """
         Compute the regret of a single experiment
         :param arm_sequence: np.array, sequence of chosen arms obtained from the policy up to time T
         :param T: int, time horizon
         :return: np.array, cumulative regret for a single experiment
         """
+        arm_sequence, context_sequence = arm_context_sequence
         print(arm_sequence)
-        expect_reward = np.dot(self.features[arm_sequence], self.real_theta)
-        best_arm_reward = np.max(np.dot(self.features, self.real_theta))
+        expect_reward = np.dot(self.all_features[context_sequence, arm_sequence], self.real_theta)
+        best_arm_reward = np.max(np.dot(self.all_features, self.real_theta))
         return best_arm_reward * np.arange(1, T + 1) - np.cumsum(expect_reward)
 
 
@@ -413,8 +415,9 @@ class FiniteContextLinMAB:
         self.store_IDS = False
 
     def set_context(self):
-        self.model.set_context()
+        context = self.model.set_context()
         self.features = self.model.features
+        return context
 
     def initPrior(self):
         a0 = 0
@@ -449,10 +452,10 @@ class FiniteContextLinMAB:
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print(t)
             # print(sigma_t)
             # if np.isnan(mu_t, sigma_t).any():
@@ -460,8 +463,8 @@ class FiniteContextLinMAB:
             theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-            reward[t], arm_sequence[t] = r_t, a_t
-        return reward, arm_sequence
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
+        return reward, (arm_sequence, context_sequence)
 
     def TS_hyper(self, T, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
@@ -476,9 +479,9 @@ class FiniteContextLinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print(t)
             # print(sigma_t)
             # if np.isnan(mu_t, sigma_t).any():
@@ -486,12 +489,12 @@ class FiniteContextLinMAB:
             theta_t = model.sample_theta(1).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
             model.put((f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
                 model.update(self.features)
-        return reward, arm_sequence
+        return reward, (arm_sequence, context_sequence)
 
     def TS_hyper_reset(self, T, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
@@ -506,9 +509,9 @@ class FiniteContextLinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print(t)
             # print(sigma_t)
             # if np.isnan(mu_t, sigma_t).any():
@@ -516,13 +519,13 @@ class FiniteContextLinMAB:
             theta_t = model.sample_theta(1).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
             model.put((f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
                 model.update(self.features)
-        return reward, arm_sequence
+        return reward, (arm_sequence, context_sequence)
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """
@@ -751,10 +754,10 @@ class FiniteContextLinMAB:
         """
 
         mu_t, sigma_t = self.initPrior()
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print("max posterior probability of action: {}".format(np.max(p_a)))
             if np.max(p_a) >= self.threshold:
                 # Stop learning policy
@@ -763,8 +766,8 @@ class FiniteContextLinMAB:
                 thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
                 a_t, p_a = self.computeVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-            reward[t], arm_sequence[t] = r_t, a_t
-        return reward, arm_sequence
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
+        return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_hyper(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
@@ -781,10 +784,10 @@ class FiniteContextLinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print("max posterior probability of action: {}".format(np.max(p_a)))
             if np.max(p_a) >= self.threshold:
                 # Stop learning policy
@@ -793,12 +796,12 @@ class FiniteContextLinMAB:
                 thetas = model.sample_theta(M)
                 a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
             model.put((f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
                 model.update(self.features)
-        return reward, arm_sequence
+        return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
@@ -815,10 +818,10 @@ class FiniteContextLinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print("max posterior probability of action: {}".format(np.max(p_a)))
             if np.max(p_a) >= self.threshold:
                 # Stop learning policy
@@ -827,13 +830,13 @@ class FiniteContextLinMAB:
                 thetas = model.sample_theta(M)
                 a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
             model.put((f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
                 model.update(self.features)
-        return reward, arm_sequence
+        return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_solution(self, T, M=10000):
         """
@@ -845,10 +848,10 @@ class FiniteContextLinMAB:
         """
 
         mu_t, sigma_t = self.initPrior()
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print("max posterior probability of action: {}".format(np.max(p_a)))
             if np.max(p_a) >= self.threshold:
                 # Stop learning policy
@@ -857,8 +860,8 @@ class FiniteContextLinMAB:
                 thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
                 a_t, p_a = self.solveVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-            reward[t], arm_sequence[t] = r_t, a_t
-        return reward, arm_sequence
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
+        return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
@@ -875,10 +878,10 @@ class FiniteContextLinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print("max posterior probability of action: {}".format(np.max(p_a)))
             if np.max(p_a) >= self.threshold:
                 # Stop learning policy
@@ -887,12 +890,12 @@ class FiniteContextLinMAB:
                 thetas = model.sample_theta(M)
                 a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
             model.put((f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
                 model.update(self.features)
-        return reward, arm_sequence
+        return reward, (arm_sequence, context_sequence)
 
     def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
@@ -909,10 +912,10 @@ class FiniteContextLinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        context_sequence, arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T, dtype=int), np.zeros(T)
         p_a = np.zeros(self.n_a)
         for t in range(T):
-            self.set_context()
+            context_t = self.set_context()
             # print("max posterior probability of action: {}".format(np.max(p_a)))
             if np.max(p_a) >= self.threshold:
                 # Stop learning policy
@@ -921,13 +924,13 @@ class FiniteContextLinMAB:
                 thetas = model.sample_theta(M)
                 a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], arm_sequence[t], context_sequence[t] = r_t, a_t, context_t
             model.put((f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
                 model.update(self.features)
-        return reward, arm_sequence
+        return reward, (arm_sequence, context_sequence)
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):
         assert n_iters >= n_samples + 99

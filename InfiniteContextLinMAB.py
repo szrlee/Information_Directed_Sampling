@@ -60,8 +60,8 @@ class ArmGaussianLinear(object):
         :param T: int, time horizon
         :return: np.array, cumulative regret for a single experiment
         """
-        print(arm_sequence)
         arm_sequence, context_sequence = arm_context_sequence
+        print(arm_sequence)
         feature = context_sequence[np.arange(T), arm_sequence]
         expect_reward = np.dot(feature, self.real_theta)
         best_arm_reward = np.max(np.dot(context_sequence, self.real_theta))

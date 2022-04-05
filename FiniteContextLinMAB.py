@@ -62,7 +62,8 @@ class ArmGaussianLinear(object):
         """
         arm_sequence, context_sequence = arm_context_sequence
         print(arm_sequence)
-        expect_reward = np.dot(self.all_features[context_sequence, arm_sequence], self.real_theta)
+        feature = self.all_features[context_sequence, arm_sequence]
+        expect_reward = np.dot(feature, self.real_theta)
         best_arm_reward = np.max(np.dot(self.all_features, self.real_theta))
         return best_arm_reward * np.arange(1, T + 1) - np.cumsum(expect_reward)
 

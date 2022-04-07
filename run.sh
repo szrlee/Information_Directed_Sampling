@@ -20,3 +20,4 @@ python main.py --game ${game} \
 echo "run $game $tag"
 
 # Zhang, FreqRusso, Russo, movieLens
+# ps -ef | grep DeepSea | awk '{print $2}'| xargs kill -9

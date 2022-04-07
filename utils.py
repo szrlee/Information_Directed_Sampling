@@ -56,32 +56,50 @@ cmap = {
 
 mapping_methods_labels = {
     "TS": "TS - Conjugacy",
-    "TS_hyper:0": "TS - HyperModel",
+    "TS_hyper": "TS - HyperModel",
     "TS_hyper:1": "TS - HyperModel FG 1.0",
     "TS_hyper:2": "TS - HyperModel FG 0.1",
+    "TS_hyper:3": "TS - HyperModel FG 0.01",
+    "TS_hyper:4": "TS - HyperModel FG Decay 1.0",
+    "TS_hyper:5": "TS - HyperModel FG Decay 10.0",
     "VIDS_sample": "Sample V-IDS - D Conjugacy",
-    "VIDS_sample_hyper:0": "Sample V-IDS - D HyperModel",
+    "VIDS_sample_hyper": "Sample V-IDS - D HyperModel",
     "VIDS_sample_hyper:1": "Sample V-IDS - D HyperModel FG 1.0",
     "VIDS_sample_hyper:2": "Sample V-IDS - D HyperModel FG 0.1",
+    "VIDS_sample_hyper:3": "Sample V-IDS - D HyperModel FG 0.01",
+    "VIDS_sample_hyper:4": "Sample V-IDS - D HyperModel FG Decay 1.0",
+    "VIDS_sample_hyper:5": "Sample V-IDS - D HyperModel FG Decay 10.0",
     "VIDS_sample_solution": "Sample V-IDS - P Conjugacy",
-    "VIDS_sample_solution_hyper:0": "Sample V-IDS - P HyperModel",
+    "VIDS_sample_solution_hyper": "Sample V-IDS - P HyperModel",
     "VIDS_sample_solution_hyper:1": "Sample V-IDS - P HyperModel FG 1.0",
     "VIDS_sample_solution_hyper:2": "Sample V-IDS - P HyperModel FG 0.1",
+    "VIDS_sample_solution_hyper:3": "Sample V-IDS - P HyperModel FG 0.01",
+    "VIDS_sample_solution_hyper:4": "Sample V-IDS - P HyperModel FG Decay 1.0",
+    "VIDS_sample_solution_hyper:5": "Sample V-IDS - P HyperModel FG Decay 10.0",
 }
 
 mapping_methods_colors = {
     "TS": "black",
-    "TS_hyper:0": "green",
+    "TS_hyper": "green",
     "TS_hyper:1": "darkgray",
-    "TS_hyper:2": "lightgray",
+    "TS_hyper:2": "rosybrown",
+    "TS_hyper:3": "black",
+    "TS_hyper:4": "darkgray",
+    "TS_hyper:5": "rosybrown",
     "VIDS_sample": "red",
-    "VIDS_sample_hyper:0": "blue",
+    "VIDS_sample_hyper": "blue",
     "VIDS_sample_hyper:1": "sienna",
     "VIDS_sample_hyper:2": "maroon",
+    "VIDS_sample_hyper:3": "red",
+    "VIDS_sample_hyper:4": "sienna",
+    "VIDS_sample_hyper:5": "maroon",
     "VIDS_sample_solution": "gold",
-    "VIDS_sample_solution_hyper:0": "purple",
+    "VIDS_sample_solution_hyper": "purple",
     "VIDS_sample_solution_hyper:1": "yellowgreen",
     "VIDS_sample_solution_hyper:2": "darkcyan",
+    "VIDS_sample_solution_hyper:3": "gold",
+    "VIDS_sample_solution_hyper:4": "yellowgreen",
+    "VIDS_sample_solution_hyper:5": "darkcyan",
 }
 
 # mapping_methods_colors = {
@@ -183,7 +201,7 @@ def storeRegret(models, methods, param_dic, n_expe, T):
             args = [T] + [param_dic[m][i] for i in args]
             # all_regrets[i, j, :] = model.regret(alg(*args)[0], T)
             all_regrets[i, j, :] = model.expect_regret(alg(*args)[1], T)
-        print(f"{alg_name}: {np.mean(all_regrets[i], axis=0)[-1]}")
+        print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
     for j, m in enumerate(methods):
         for i in range(n_expe):
             final_regrets[j, i] = all_regrets[j, i, -1]

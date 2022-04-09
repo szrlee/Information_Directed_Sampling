@@ -32,13 +32,14 @@ def get_args():
     # environment config
     parser.add_argument('--game', type=str, default='Russo')
     parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--fg-lambda', type=float, default=1.)
     parser.add_argument('--noise_dim', type=int, default=2)
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--update-num', type=int, default=100)
     parser.add_argument('--repeat-num', type=int, default=500)
     parser.add_argument('--time-period', type=int, default=50)
     parser.add_argument('--n-expe', type=int, default=3)
-    parser.add_argument('--n-context', type=int, default=10)
+    parser.add_argument('--n-context', type=int, default=0)
     parser.add_argument('--optim', type=str, default='Adam', choices=['Adam', 'SGD'])
     parser.add_argument('--norm-noise', type=int, default=0, choices=[0, 1])
     args = parser.parse_known_args()[0]
@@ -64,6 +65,8 @@ param = {
     "IDS_approx": {"N": 1000, "display_results": False},
     "IDS_sample": {"M": 10000, "VIDS": False}, # The parameter VIDS is only reserved for Bernoulli MAB
     "TS_hyper": {'fg_lambda':0.0, 'fg_decay': False, **hyper_params},
+    "TS_hyper:FG": {'fg_lambda':args.fg_lambda, 'fg_decay': False, **hyper_params},
+    "TS_hyper:FG Decay": {'fg_lambda':args.fg_lambda, 'fg_decay': True, **hyper_params},
     "TS_hyper:1": {'fg_lambda':1.0, 'fg_decay': False, **hyper_params},
     "TS_hyper:2": {'fg_lambda':0.1, 'fg_decay': False, **hyper_params},
     "TS_hyper:3": {'fg_lambda':0.01, 'fg_decay': False, **hyper_params},
@@ -73,6 +76,8 @@ param = {
     "VIDS_approx": {"rg": 10.0, "N": 1000},
     "VIDS_sample": {"M": 10000, "VIDS": True}, # The parameter VIDS is only reserved for Bernoulli MAB
     "VIDS_sample_hyper": {"M": 10000, 'fg_lambda':0.0, 'fg_decay': False, **hyper_params},
+    "VIDS_sample_hyper:FG": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': False, **hyper_params},
+    "VIDS_sample_hyper:FG Decay": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': True, **hyper_params},
     "VIDS_sample_hyper:1": {"M": 10000, 'fg_lambda':1.0, 'fg_decay': False, **hyper_params},
     "VIDS_sample_hyper:2": {"M": 10000, 'fg_lambda':0.1, 'fg_decay': False, **hyper_params},
     "VIDS_sample_hyper:3": {"M": 10000, 'fg_lambda':0.01, 'fg_decay': False, **hyper_params},
@@ -81,6 +86,8 @@ param = {
     "VIDS_sample_hyper_reset": {"M": 10000, **hyper_reset_params},
     "VIDS_sample_solution": {"M": 10000, "VIDS": True},
     "VIDS_sample_solution_hyper": {"M": 10000, 'fg_lambda':0.0, 'fg_decay': False, **hyper_params},
+    "VIDS_sample_solution_hyper:FG": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': False, **hyper_params},
+    "VIDS_sample_solution_hyper:FG Decay": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': True, **hyper_params},
     "VIDS_sample_solution_hyper:1": {"M": 10000, 'fg_lambda':1.0, 'fg_decay': False, **hyper_params},
     "VIDS_sample_solution_hyper:2": {"M": 10000, 'fg_lambda':0.1, 'fg_decay': False, **hyper_params},
     "VIDS_sample_solution_hyper:3": {"M": 10000, 'fg_lambda':0.01, 'fg_decay': False, **hyper_params},
@@ -96,20 +103,26 @@ param = {
 linear_methods = [
     "TS",
     "TS_hyper",
+    "TS_hyper:FG Decay",
+    "VIDS_sample",
+    "VIDS_sample_hyper",
+    "VIDS_sample_hyper:FG Decay",
+    "VIDS_sample_solution",
+    "VIDS_sample_solution_hyper",
+    "VIDS_sample_solution_hyper:FG Decay",
+    # "TS_hyper:FG",
+    # "VIDS_sample_hyper:FG",
+    # "VIDS_sample_solution_hyper:FG",
     # "TS_hyper:1",
     # "TS_hyper:2",
     # "TS_hyper:3",
     # "TS_hyper:4",
     # "TS_hyper:5",
-    "VIDS_sample",
-    "VIDS_sample_hyper",
     # "VIDS_sample_hyper:1",
     # "VIDS_sample_hyper:2",
     # "VIDS_sample_hyper:3",
     # "VIDS_sample_hyper:4",
     # "VIDS_sample_hyper:5",
-    "VIDS_sample_solution",
-    "VIDS_sample_solution_hyper",
     # "VIDS_sample_solution_hyper:1",
     # "VIDS_sample_solution_hyper:2",
     # "VIDS_sample_solution_hyper:3",

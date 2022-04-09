@@ -768,16 +768,10 @@ class FiniteContextLinMAB:
 
         mu_t, sigma_t = self.initPrior()
         action_sets, arm_sequence, reward = np.zeros((T, self.n_a, self.d)), np.zeros(T, dtype=int), np.zeros(T)
-        p_a = np.zeros(self.n_a)
         for t in range(T):
             self.set_context()
-            # print("max posterior probability of action: {}".format(np.max(p_a)))
-            if np.max(p_a) >= self.threshold:
-                # Stop learning policy
-                a_t = np.argmax(p_a)
-            else:
-                thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
-                a_t, p_a = self.computeVIDS(thetas)
+            thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+            a_t, p_a = self.computeVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t], action_sets[t] = r_t, a_t, self.features
         return reward, (arm_sequence, action_sets)
@@ -798,16 +792,10 @@ class FiniteContextLinMAB:
         )
 
         action_sets, arm_sequence, reward = np.zeros((T, self.n_a, self.d)), np.zeros(T, dtype=int), np.zeros(T)
-        p_a = np.zeros(self.n_a)
         for t in range(T):
             self.set_context()
-            # print("max posterior probability of action: {}".format(np.max(p_a)))
-            if np.max(p_a) >= self.threshold:
-                # Stop learning policy
-                a_t = np.argmax(p_a)
-            else:
-                thetas = model.sample_theta(M)
-                a_t, p_a = self.computeVIDS(thetas)
+            thetas = model.sample_theta(M)
+            a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], action_sets[t] = r_t, a_t, self.features
             model.put((self.features, f_t, r_t))
@@ -832,16 +820,10 @@ class FiniteContextLinMAB:
         )
 
         action_sets, arm_sequence, reward = np.zeros((T, self.n_a, self.d)), np.zeros(T, dtype=int), np.zeros(T)
-        p_a = np.zeros(self.n_a)
         for t in range(T):
             self.set_context()
-            # print("max posterior probability of action: {}".format(np.max(p_a)))
-            if np.max(p_a) >= self.threshold:
-                # Stop learning policy
-                a_t = np.argmax(p_a)
-            else:
-                thetas = model.sample_theta(M)
-                a_t, p_a = self.computeVIDS(thetas)
+            thetas = model.sample_theta(M)
+            a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], action_sets[t] = r_t, a_t, self.features
             model.put((self.features, f_t, r_t))
@@ -862,16 +844,10 @@ class FiniteContextLinMAB:
 
         mu_t, sigma_t = self.initPrior()
         action_sets, arm_sequence, reward = np.zeros((T, self.n_a, self.d)), np.zeros(T, dtype=int), np.zeros(T)
-        p_a = np.zeros(self.n_a)
         for t in range(T):
             self.set_context()
-            # print("max posterior probability of action: {}".format(np.max(p_a)))
-            if np.max(p_a) >= self.threshold:
-                # Stop learning policy
-                a_t = np.argmax(p_a)
-            else:
-                thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
-                a_t, p_a = self.solveVIDS(thetas)
+            thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
+            a_t, p_a = self.solveVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], arm_sequence[t], action_sets[t] = r_t, a_t, self.features
         return reward, (arm_sequence, action_sets)
@@ -892,16 +868,10 @@ class FiniteContextLinMAB:
         )
 
         action_sets, arm_sequence, reward = np.zeros((T, self.n_a, self.d)), np.zeros(T, dtype=int), np.zeros(T)
-        p_a = np.zeros(self.n_a)
         for t in range(T):
             self.set_context()
-            # print("max posterior probability of action: {}".format(np.max(p_a)))
-            if np.max(p_a) >= self.threshold:
-                # Stop learning policy
-                a_t = np.argmax(p_a)
-            else:
-                thetas = model.sample_theta(M)
-                a_t, p_a = self.solveVIDS(thetas)
+            thetas = model.sample_theta(M)
+            a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], action_sets[t] = r_t, a_t, self.features
             model.put((self.features, f_t, r_t))
@@ -926,16 +896,10 @@ class FiniteContextLinMAB:
         )
 
         action_sets, arm_sequence, reward = np.zeros((T, self.n_a, self.d)), np.zeros(T, dtype=int), np.zeros(T)
-        p_a = np.zeros(self.n_a)
         for t in range(T):
             self.set_context()
-            # print("max posterior probability of action: {}".format(np.max(p_a)))
-            if np.max(p_a) >= self.threshold:
-                # Stop learning policy
-                a_t = np.argmax(p_a)
-            else:
-                thetas = model.sample_theta(M)
-                a_t, p_a = self.solveVIDS(thetas)
+            thetas = model.sample_theta(M)
+            a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], arm_sequence[t], action_sets[t] = r_t, a_t, self.features
             model.put((self.features, f_t, r_t))

@@ -47,17 +47,14 @@ class ArmGaussianLinear(object):
         best_arm_reward = np.max(np.dot(self.features, self.real_theta))
         return best_arm_reward * np.arange(1, T + 1) - np.cumsum(reward)
 
-    def expect_regret(self, arm_sequence, T):
+    def expect_regret(self, arm, action_set):
         """
-        Compute the regret of a single experiment
-        :param arm_sequence: np.array, sequence of chosen arms obtained from the policy up to time T
-        :param T: int, time horizon
-        :return: np.array, cumulative regret for a single experiment
+        Compute the regret of a single step
         """
-        print(arm_sequence)
-        expect_reward = np.dot(self.features[arm_sequence], self.real_theta)
-        best_arm_reward = np.max(np.dot(self.features, self.real_theta))
-        return best_arm_reward * np.arange(1, T + 1) - np.cumsum(expect_reward)
+        arm_reward = np.dot(action_set, self.real_theta)
+        expect_reward = arm_reward[arm]
+        best_arm_reward = arm_reward.max()
+        return best_arm_reward - expect_reward
 
 
 class PaperLinModel(ArmGaussianLinear):
@@ -215,7 +212,7 @@ class LinMAB:
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
         for t in range(T):
             # print(t)
@@ -225,8 +222,8 @@ class LinMAB:
             theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-            reward[t], arm_sequence[t] = r_t, a_t
-        return reward, arm_sequence
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
+        return reward, expected_regret
 
     def TS_hyper(self, T, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
@@ -241,7 +238,7 @@ class LinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             # print(t)
             # print(sigma_t)
@@ -250,12 +247,12 @@ class LinMAB:
             theta_t = model.sample_theta(1).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
             model.put((self.features, f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
                 model.update()
-        return reward, arm_sequence
+        return reward, expected_regret
 
     def TS_hyper_reset(self, T, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
@@ -270,7 +267,7 @@ class LinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             # print(t)
             # print(sigma_t)
@@ -279,13 +276,13 @@ class LinMAB:
             theta_t = model.sample_theta(1).T
             a_t = rd_argmax(np.dot(self.features, theta_t))
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
             model.put((self.features, f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
                 model.update()
-        return reward, arm_sequence
+        return reward, expected_regret
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """
@@ -514,13 +511,13 @@ class LinMAB:
         """
 
         mu_t, sigma_t = self.initPrior()
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
             a_t, p_a = self.computeVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-            reward[t], arm_sequence[t] = r_t, a_t
-        return reward, arm_sequence
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
+        return reward, expected_regret
 
     def VIDS_sample_hyper(self, T, M=10000, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
@@ -537,17 +534,17 @@ class LinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             thetas = model.sample_theta(M)
             a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
             model.put((self.features, f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
                 model.update()
-        return reward, arm_sequence
+        return reward, expected_regret
 
     def VIDS_sample_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
@@ -564,18 +561,18 @@ class LinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             thetas = model.sample_theta(M)
             a_t, p_a = self.computeVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
             model.put((self.features, f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
                 model.update()
-        return reward, arm_sequence
+        return reward, expected_regret
 
     def VIDS_sample_solution(self, T, M=10000):
         """
@@ -587,13 +584,13 @@ class LinMAB:
         """
 
         mu_t, sigma_t = self.initPrior()
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
             a_t, p_a = self.solveVIDS(thetas)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
-            reward[t], arm_sequence[t] = r_t, a_t
-        return reward, arm_sequence
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
+        return reward, expected_regret
 
     def VIDS_sample_solution_hyper(self, T, M=10000, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01, batch_size=32, optim='Adam', update_num=2):
         """
@@ -610,17 +607,17 @@ class LinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             thetas = model.sample_theta(M)
             a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
             model.put((self.features, f_t, r_t))
             # update hypermodel
             for _ in range(update_num):
                 model.update()
-        return reward, arm_sequence
+        return reward, expected_regret
 
     def VIDS_sample_solution_hyper_reset(self, T, M=10000, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01, batch_size=32, optim='Adam', update_num=1):
         """
@@ -637,18 +634,18 @@ class LinMAB:
             target_noise_coef=self.eta, norm_coef=norm_coef, reset=True
         )
 
-        arm_sequence, reward = np.zeros(T, dtype=int), np.zeros(T)
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             thetas = model.sample_theta(M)
             a_t, p_a = self.solveVIDS(thetas)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            reward[t], arm_sequence[t] = r_t, a_t
+            reward[t], expected_regret[t] = r_t, self.model.expect_regret(a_t, self.features)
             model.put((self.features, f_t, r_t))
             # update hypermodel
             model.reset()
             for _ in range(update_num):
                 model.update()
-        return reward, arm_sequence
+        return reward, expected_regret
 
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):
         assert n_iters >= n_samples + 99

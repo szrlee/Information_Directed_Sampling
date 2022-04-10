@@ -211,8 +211,8 @@ def storeRegret(models, methods, param_dic, n_expe, T):
             alg = model.__getattribute__(alg_name)
             args = inspect.getfullargspec(alg)[0][2:]
             args = [T] + [param_dic[m][i] for i in args]
-            # all_regrets[i, j, :] = model.regret(alg(*args)[0], T)
-            all_regrets[i, j, :] = model.expect_regret(alg(*args)[1], T)
+            reward, regret = alg(*args)
+            all_regrets[i, j, :] = np.cumsum(regret)
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
     for j, m in enumerate(methods):
         for i in range(n_expe):

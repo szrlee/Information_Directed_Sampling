@@ -143,6 +143,7 @@ class FiniteContextFGTSLinModel(ArmGaussianLinear):
             self.all_features[:, 2:] = 0.2 * self.all_features[:, 2:] / np.expand_dims(np.linalg.norm(self.all_features[:, 2:], axis=1), axis=1)
             # print(self.features)
             # print(np.linalg.norm(self.features, axis=1))
+        self.all_features[np.where(self.all_features == 0)] = 1e-6
         # print(self.features)
         self.real_theta = np.zeros(n_features)
         self.real_theta[0:2] = 1.0

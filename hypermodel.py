@@ -145,12 +145,11 @@ class Net(nn.Module):
 
 
 class ReplayBuffer:
-    def __init__(self, noise_dim=2):
-        self.f_list = []
-        self.r_list = []
-        self.z_list = []
-        self.s_list = []
-        self.noise_dim = noise_dim
+    def __init__(self, buffer_size, buffer_shape):
+        self.buffers = {
+            key: np.empty([buffer_size, *shape]) for key, shape in buffer_shape.items()
+        }
+        self.noise_dim = buffer_shape['z'][-1]
         self.sample_num = 0
 
     def __len__(self):
@@ -161,40 +160,44 @@ class ReplayBuffer:
         noise /= np.linalg.norm(noise)
         return noise
 
+    def _sample(self, index):
+        a_data = self.buffers['a'][:self.sample_num]
+        s_data = self.buffers['s'][:self.sample_num]
+        f_data = s_data[np.arange(self.sample_num), a_data.astype(np.int32)]
+        r_data = self.buffers['r'][:self.sample_num]
+        z_data = self.buffers['z'][:self.sample_num]
+        s_data, f_data, r_data, z_data \
+            = s_data[index], f_data[index], r_data[index], z_data[index]
+        return s_data, f_data, r_data, z_data
+
+    def reset(self):
+        self.sample_num = 0
+
     def put(self, transition):
-        s, f, r = transition
+        for k, v in transition.items():
+            self.buffers[k][self.sample_num] = v
         z = self._unit_sphere_noise()
-        self.s_list.append(s)
-        self.f_list.append(f)
-        self.r_list.append(r)
-        self.z_list.append(z)
+        self.buffers['z'][self.sample_num] = z
         self.sample_num += 1
 
     def get(self, shuffle=True):
         index = list(range(self.sample_num))
         if shuffle:
             np.random.shuffle(index)
-        s_data, f_data, r_data, z_data \
-            = np.array(self.s_list), np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
-        s_data, f_data, r_data, z_data \
-            = s_data[index], f_data[index], r_data[index], z_data[index]
-        return s_data, f_data, r_data, z_data
+        return self._sample(index)
 
     def sample(self, n):
         index = np.random.randint(low=0, high=self.sample_num, size=n)
-        s_data, f_data, r_data, z_data \
-            = np.array(self.s_list), np.array(self.f_list), np.array(self.r_list), np.array(self.z_list)
-        s_data, f_data, r_data, z_data \
-            = s_data[index], f_data[index], r_data[index], z_data[index]
-        return s_data, f_data, r_data, z_data
+        return self._sample(index)
 
 
 class HyperModel:
     def __init__(
         self,
         noise_dim: int,
-        feature_dim: int,
-        hidden_sizes: Sequence[int] = (64, 64),
+        n_action: int,
+        n_feature: int,
+        hidden_sizes: Sequence[int] = (),
         prior_std: float or np.ndarray = 1.0,
         prior_mean: float or np.ndarray = 0.0,
         prior_scale: float = 1.0,
@@ -206,11 +209,13 @@ class HyperModel:
         fg_decay: bool = True,
         norm_coef: float = 0.01,
         target_noise_coef: float = 0.01,
+        buffer_size: int = 10000,
         reset: bool = False,
     ):
 
         self.noise_dim = noise_dim
-        self.feature_dim = feature_dim
+        self.action_dim = n_action
+        self.feature_dim = n_feature
         self.hidden_sizes = hidden_sizes
         self.prior_std = prior_std
         self.prior_mean = prior_mean
@@ -223,6 +228,7 @@ class HyperModel:
         self.optim = optim
         self.norm_coef = norm_coef
         self.target_noise_coef = target_noise_coef
+        self.buffer_size = buffer_size
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         self.__init_model_optimizer()
@@ -246,7 +252,14 @@ class HyperModel:
             raise NotImplementedError
 
     def __init_buffer(self):
-        self.buffer = ReplayBuffer(noise_dim=self.noise_dim) # init replay buffer
+        # init replay buffer
+        buffer_shape = {
+            's': (self.action_dim, self.feature_dim),
+            'a': (),
+            'r': (1,),
+            'z': (self.noise_dim, )
+        }
+        self.buffer = ReplayBuffer(self.buffer_size, buffer_shape)
 
     def put(self, transition):
         self.buffer.put(transition)
@@ -263,7 +276,7 @@ class HyperModel:
                 s_batch, f_batch, r_batch, z_batch \
                     = s_data[i:i+self.batch_size], f_data[i:i+self.batch_size], r_data[i: i+self.batch_size], z_data[i:i+self.batch_size]
                 self.learn(s_batch, f_batch, r_batch, z_batch)
-            if sample_num % self.batch_size !=0:
+            if sample_num % self.batch_size != 0:
                 last_sample = sample_num % self.batch_size
                 index1 = -np.arange(1, last_sample + 1).astype(np.int32)
                 index2 = np.random.randint(low=0, high=sample_num, size=self.batch_size-last_sample)

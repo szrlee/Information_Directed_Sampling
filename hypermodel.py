@@ -1,6 +1,21 @@
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
+
+from utils import rd_argmax
+
+def mlp(input_dim, hidden_sizes, linear_layer=nn.Linear):
+    model = []
+    if len(hidden_sizes) > 0 :
+        hidden_sizes = [input_dim] + list(hidden_sizes)
+        for i in range(1, len(hidden_sizes)):
+            model += [linear_layer(hidden_sizes[i-1], hidden_sizes[i])]
+            model += [nn.ReLU(inplace=True)]
+    model = nn.Sequential(*model)
+    return model
+
 
 class PriorHyperLinear(torch.nn.Module):
     def __init__(
@@ -70,21 +85,63 @@ class HyperLinear(nn.Module):
         self.prior_scale = prior_scale
         self.posterior_scale = posterior_scale
 
-    def forward(self, x, z):
-        theta = self.get_theta(z)
-        out = torch.mul(x, theta).sum(-1)
-        return out
-
-    def get_theta(self, z):
+    def forward(self, z, x, prior_x):
         theta = self.hypermodel(z)
         prior_theta = self.priormodel(z)
-        theta = self.posterior_scale * theta + self.prior_scale * prior_theta
-        return theta
+
+        if len(x.shape) > 2:
+            out = torch.einsum('bd,bad -> ba', theta, x)
+            prior_out = torch.einsum('bd,bad -> ba', prior_theta, prior_x)
+        else:
+            out = torch.mul(x, theta).sum(-1)
+            prior_out = torch.mul(prior_x, prior_theta).sum(-1)
+
+        out = self.posterior_scale * out + self.prior_scale * prior_out
+        return out
 
     def regularization(self, z):
         theta = self.hypermodel(z)
         reg_loss = theta.pow(2).mean()
         return reg_loss
+
+
+class Net(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_sizes: Sequence[int] = (),
+        noise_dim: int = 2,
+        prior_std: float or np.ndarray = 1.0,
+        prior_mean: float or np.ndarray = 0.0,
+        prior_scale: float = 1.0,
+        posterior_scale: float = 1.0,
+        device: Union[str, int, torch.device] = "cpu",
+    ):
+        super().__init__()
+        self.basedmodel = mlp(in_features, hidden_sizes)
+        self.priormodel = mlp(in_features, hidden_sizes)
+        for param in self.priormodel.parameters():
+            param.requires_grad = False
+
+        hyper_out_features = in_features if len(hidden_sizes) == 0 else hidden_sizes[-1]
+        self.out = HyperLinear(
+            noise_dim, hyper_out_features,
+            prior_std, prior_mean,
+            prior_scale, posterior_scale,
+        )
+        self.device = device
+
+    def forward(self, z, x):
+        z = torch.as_tensor(z, device=self.device, dtype=torch.float32)
+        x = torch.as_tensor(x, device=self.device, dtype=torch.float32)
+        logits = self.basedmodel(x)
+        prior_logits = self.priormodel(x)
+        out = self.out(z, logits, prior_logits)
+        return out
+
+    def regularization(self, z):
+        z = torch.as_tensor(z, device=self.device, dtype=torch.float32)
+        return self.out.regularization(z)
 
 
 class ReplayBuffer:
@@ -135,17 +192,18 @@ class ReplayBuffer:
 class HyperModel:
     def __init__(
         self,
-        noise_dim,
-        feature_dim,
+        noise_dim: int,
+        feature_dim: int,
+        hidden_sizes: Sequence[int] = (64, 64),
         prior_std: float or np.ndarray = 1.0,
         prior_mean: float or np.ndarray = 0.0,
         prior_scale: float = 1.0,
         posterior_scale: float = 1.0,
-        lr: float = 0.01,
-        fg_lambda: float = 1.0,
-        fg_decay: bool = True,
         batch_size: int = 32,
+        lr: float = 0.01,
         optim: str = 'Adam',
+        fg_lambda: float = 0.0,
+        fg_decay: bool = True,
         norm_coef: float = 0.01,
         target_noise_coef: float = 0.01,
         reset: bool = False,
@@ -153,6 +211,7 @@ class HyperModel:
 
         self.noise_dim = noise_dim
         self.feature_dim = feature_dim
+        self.hidden_sizes = hidden_sizes
         self.prior_std = prior_std
         self.prior_mean = prior_mean
         self.prior_scale = prior_scale
@@ -171,15 +230,18 @@ class HyperModel:
         self.update = getattr(self, '_update_reset') if reset else getattr(self, '_update')
 
     def __init_model_optimizer(self):
-        self.model = HyperLinear(
-            self.noise_dim, self.feature_dim,
-            self.prior_std, self.prior_mean,
-            self.prior_scale, self.posterior_scale
-        ).to(self.device) # init hypermodel
+        # init hypermodel
+        self.model = Net(
+            self.feature_dim, self.hidden_sizes, self.noise_dim, 
+            self.prior_std, self.prior_mean, self.prior_scale,
+            self.posterior_scale, device=self.device
+        ).to(self.device)
+        print(f"Network structure:\n{str(self.model)}")
+         # init optimizer
         if self.optim == "Adam":
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr) # init optimizer
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         elif self.optim == "SGD":
-            self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9) # init optimizer
+            self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
         else:
             raise NotImplementedError
 
@@ -220,32 +282,32 @@ class HyperModel:
 
         update_noise = self.generate_noise(self.batch_size) # sample noise for update
         target_noise = torch.mul(z_batch, update_noise).sum(-1) * self.target_noise_coef # noise for target
-        theta = self.model.get_theta(update_noise)
-
-        fg_lambda = self.fg_lambda / np.sqrt(len(self.buffer)) if self.fg_decay else self.fg_lambda
-        norm_coef = self.norm_coef / len(self.buffer)
-        fg_term = torch.einsum('bd,bad -> ba', theta, s_batch).max(dim=-1)[0]
-        predict = self.model(f_batch, update_noise)
+        predict = self.model(update_noise, f_batch)
         diff = target_noise + r_batch - predict
-        loss = (diff.pow(2) - fg_lambda * fg_term).mean()
+        if self.fg_lambda:
+            fg_lambda = self.fg_lambda / np.sqrt(len(self.buffer)) if self.fg_decay else self.fg_lambda
+            fg_term = self.model(update_noise, s_batch)
+            fg_term = fg_term.max(dim=-1)[0]
+            loss = (diff.pow(2) - fg_lambda * fg_term).mean()
+        else:
+            loss = diff.pow(2).mean()
+        norm_coef = self.norm_coef / len(self.buffer)
         reg_loss = self.model.regularization(update_noise) * norm_coef
-
         loss += reg_loss
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-    def sample_theta(self, M):
-        action_noise = self.generate_noise(M)
+    def get_action(self, features):
+        action_noise = self.generate_noise(1)
         with torch.no_grad():
-            thetas = self.model.get_theta(action_noise).cpu().numpy()
-        return thetas
+            p_a = self.model(action_noise, features).cpu().numpy()
+        return rd_argmax(p_a)
 
     def generate_noise(self, batch_size):
         noise = torch.randn(batch_size, self.noise_dim).type(torch.float32).to(self.device)
-        # noise = noise / torch.norm(noise, dim=1, keepdim=True)
         return noise
 
     def reset(self):
         self.__init_model_optimizer()
-

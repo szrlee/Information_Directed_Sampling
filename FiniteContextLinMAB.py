@@ -156,6 +156,76 @@ class FiniteContextFGTSLinModel(ArmGaussianLinear):
         )
 
 
+class SyntheticNonlinModel:
+    def __init__(self, n_features=50, n_actions=20, all_actions=100, eta=sqrt(0.1), sigma=1, reward_version='v1'):
+        self.prior_random = np.random.RandomState(2021)
+        self.reward_random = np.random.RandomState(2022)
+
+        # feture
+        x = self.prior_random.randn(all_actions, n_features)
+        x /= np.linalg.norm(x, axis=1, keepdims=True)
+        self.all_features = x
+
+        # reward
+        if reward_version == 'v1':
+            self.reward_fn = getattr(self, 'reward_fn1')
+            theta = self.prior_random.normal(0, sigma, size=(n_features, n_features))
+            self.real_theta = theta @ theta.T
+        elif reward_version == 'v2':
+            self.reward_fn = getattr(self, 'reward_fn2')
+            theta = self.prior_random.normal(0, sigma, size=n_features)
+            self.real_theta = theta / np.linalg.norm(theta)
+        else:
+            raise NotImplementedError
+        self.all_rewards = np.array([self.reward_fn(self.all_features[arm]) for arm in range(all_actions)])
+
+        self.sub_actions = n_actions
+        self.all_actions = all_actions
+        self.eta = eta
+        self.alg_prior_sigma = sigma
+        self.set_context()
+
+    @property
+    def n_features(self):
+        return self.features.shape[1]
+
+    @property
+    def n_actions(self):
+        return self.features.shape[0]
+
+    def set_context(self):
+        action_set = np.arange(self.all_actions, dtype=np.int32)
+        sub_action_set = np.random.choice(action_set, size=self.sub_actions, replace=False)
+        self.features = self.all_features[sub_action_set]
+        self.sub_rewards = self.all_rewards[sub_action_set]
+
+    def reward_fn1(self, feature):
+        reward = 0.01 * feature.T @ self.real_theta @ feature
+        return reward
+
+    def reward_fn2(self, feature):
+        reward = np.exp(-10 * np.dot(feature, self.real_theta) ** 2)
+        return reward
+
+    def reward(self, arm):
+        reward = self.sub_rewards[arm]
+        noise = self.reward_random.normal(0, self.eta, 1)
+        return reward + noise
+
+    def regret(self, arm):
+        expect_reward = self.sub_rewards[arm]
+        best_arm_reward = self.sub_rewards.max()
+        return best_arm_reward - expect_reward
+
+    def expect_regret(self, arm, action_set):
+        """
+        Compute the regret of a single step
+        """
+        expect_reward = self.sub_rewards[arm]
+        best_arm_reward = self.sub_rewards.max()
+        return best_arm_reward - expect_reward
+
+
 class FiniteContextLinMAB:
     def __init__(self, model):
         """

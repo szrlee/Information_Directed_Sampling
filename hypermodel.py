@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from utils import rd_argmax
 
 def mlp(input_dim, hidden_sizes, linear_layer=nn.Linear):
     model = []
@@ -90,9 +89,15 @@ class HyperLinear(nn.Module):
         prior_theta = self.priormodel(z)
 
         if len(x.shape) > 2:
+            # compute feel-good term
             out = torch.einsum('bd,bad -> ba', theta, x)
             prior_out = torch.einsum('bd,bad -> ba', prior_theta, prior_x)
+        elif x.shape[0] != z.shape[0]:
+            # compute action value for one action set
+            out = torch.mm(theta, x.T)
+            prior_out = torch.mm(prior_theta, x.T)
         else:
+            # compute predict reward in batch
             out = torch.mul(x, theta).sum(-1)
             prior_out = torch.mul(prior_x, prior_theta).sum(-1)
 
@@ -103,6 +108,12 @@ class HyperLinear(nn.Module):
         theta = self.hypermodel(z)
         reg_loss = theta.pow(2).mean()
         return reg_loss
+
+    def get_thetas(self, z):
+        theta = self.hypermodel(z)
+        prior_theta = self.priormodel(z)
+        theta = self.posterior_scale * theta + self.prior_scale * prior_theta
+        return theta
 
 
 class Net(nn.Module):
@@ -181,12 +192,14 @@ class ReplayBuffer:
         self.sample_num += 1
 
     def get(self, shuffle=True):
+        # get all data in buffer
         index = list(range(self.sample_num))
         if shuffle:
             np.random.shuffle(index)
         return self._sample(index)
 
     def sample(self, n):
+        # get n data in buffer
         index = np.random.randint(low=0, high=self.sample_num, size=n)
         return self._sample(index)
 
@@ -261,9 +274,6 @@ class HyperModel:
         }
         self.buffer = ReplayBuffer(self.buffer_size, buffer_shape)
 
-    def put(self, transition):
-        self.buffer.put(transition)
-
     def _update(self):
         s_batch, f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
         self.learn(s_batch, f_batch, r_batch, z_batch)
@@ -286,6 +296,9 @@ class HyperModel:
         else:
             s_batch, f_batch, r_batch, z_batch = self.buffer.sample(self.batch_size)
             self.learn(s_batch, f_batch, r_batch, z_batch)
+
+    def put(self, transition):
+        self.buffer.put(transition)
 
     def learn(self, s_batch, f_batch, r_batch, z_batch):
         z_batch = torch.FloatTensor(z_batch).to(self.device)
@@ -312,11 +325,18 @@ class HyperModel:
         loss.backward()
         self.optimizer.step()
 
-    def get_action(self, features):
-        action_noise = self.generate_noise(1)
+    def get_thetas(self, M=1):
+        assert len(self.hidden_sizes) == 0, f'hidden size > 0'
+        action_noise = self.generate_noise(M)
+        with torch.no_grad():
+            thetas = self.model.out.get_thetas(action_noise).cpu().numpy()
+        return thetas
+
+    def predict(self, features, M=1):
+        action_noise = self.generate_noise(M)
         with torch.no_grad():
             p_a = self.model(action_noise, features).cpu().numpy()
-        return rd_argmax(p_a)
+        return p_a
 
     def generate_noise(self, batch_size):
         noise = torch.randn(batch_size, self.noise_dim).type(torch.float32).to(self.device)

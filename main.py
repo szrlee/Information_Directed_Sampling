@@ -35,6 +35,8 @@ def get_args():
     parser.add_argument('--fg-lambda', type=float, default=1.)
     parser.add_argument('--noise_dim', type=int, default=2)
     parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--hidden-size', type=int, default=64)
+    parser.add_argument('--hidden-layer', type=int, default=0)
     parser.add_argument('--update-num', type=int, default=100)
     parser.add_argument('--repeat-num', type=int, default=500)
     parser.add_argument('--time-period', type=int, default=50)
@@ -52,82 +54,49 @@ dir = f"{game.lower()}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}"
 path = os.path.expanduser(os.path.join("~/results/vids/", game, dir))
 os.makedirs(path, exist_ok=True)
 
-hyper_params = {'noise_dim': args.noise_dim, 'lr': args.lr, 'batch_size': args.batch_size, 'optim': args.optim, 'update_num': args.update_num}
-hyper_reset_params = {'noise_dim': args.noise_dim, 'lr': args.lr, 'batch_size': args.batch_size, 'optim': args.optim, 'update_num': args.repeat_num}
+args.hidden_sizes = [args.hidden_size] * args.hidden_layer
+hyper_params = {
+    'noise_dim': args.noise_dim, 'lr': args.lr, 'batch_size': args.batch_size,
+    'optim': args.optim, 'hidden_sizes': args.hidden_sizes,'update_num': args.update_num,
+    'fg_lambda':args.fg_lambda,'fg_decay': True, 'reset':False
+}
+
 param = {
-    "UCB1": {"rho": np.sqrt(2)},
-    "LinUCB": {"lbda": 10e-4, "alpha": 10e-1},
-    "BayesUCB": {"p1": 1, "p2": 1, "c": 0},
-    "MOSS": {"rho": 0.2},
-    "ExploreCommit": {"m": 10},
-    "Tuned_GPUCB": {"c": 0.9},
-    "IDS": {"M": 1000},
-    "IDS_approx": {"N": 1000, "display_results": False},
-    "IDS_sample": {"M": 10000, "VIDS": False}, # The parameter VIDS is only reserved for Bernoulli MAB
-    "TS_hyper": {'fg_lambda':0.0, 'fg_decay': False, **hyper_params},
-    "TS_hyper:FG": {'fg_lambda':args.fg_lambda, 'fg_decay': False, **hyper_params},
-    "TS_hyper:FG Decay": {'fg_lambda':args.fg_lambda, 'fg_decay': True, **hyper_params},
-    "TS_hyper:1": {'fg_lambda':1.0, 'fg_decay': False, **hyper_params},
-    "TS_hyper:2": {'fg_lambda':0.1, 'fg_decay': False, **hyper_params},
-    "TS_hyper:3": {'fg_lambda':0.01, 'fg_decay': False, **hyper_params},
-    "TS_hyper:4": {'fg_lambda':1.0, 'fg_decay': True, **hyper_params},
-    "TS_hyper:5": {'fg_lambda':10., 'fg_decay': True, **hyper_params},
-    "TS_hyper_reset": hyper_reset_params,
-    "VIDS_approx": {"rg": 10.0, "N": 1000},
-    "VIDS_sample": {"M": 10000, "VIDS": True}, # The parameter VIDS is only reserved for Bernoulli MAB
-    "VIDS_sample_hyper": {"M": 10000, 'fg_lambda':0.0, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_hyper:FG": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_hyper:FG Decay": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': True, **hyper_params},
-    "VIDS_sample_hyper:1": {"M": 10000, 'fg_lambda':1.0, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_hyper:2": {"M": 10000, 'fg_lambda':0.1, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_hyper:3": {"M": 10000, 'fg_lambda':0.01, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_hyper:4": {"M": 10000, 'fg_lambda':1.0, 'fg_decay': True, **hyper_params},
-    "VIDS_sample_hyper:5": {"M": 10000, 'fg_lambda':10., 'fg_decay': True, **hyper_params},
-    "VIDS_sample_hyper_reset": {"M": 10000, **hyper_reset_params},
-    "VIDS_sample_solution": {"M": 10000, "VIDS": True},
-    "VIDS_sample_solution_hyper": {"M": 10000, 'fg_lambda':0.0, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_solution_hyper:FG": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_solution_hyper:FG Decay": {"M": 10000, 'fg_lambda':args.fg_lambda, 'fg_decay': True, **hyper_params},
-    "VIDS_sample_solution_hyper:1": {"M": 10000, 'fg_lambda':1.0, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_solution_hyper:2": {"M": 10000, 'fg_lambda':0.1, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_solution_hyper:3": {"M": 10000, 'fg_lambda':0.01, 'fg_decay': False, **hyper_params},
-    "VIDS_sample_solution_hyper:4": {"M": 10000, 'fg_lambda':1.0, 'fg_decay': True, **hyper_params},
-    "VIDS_sample_solution_hyper:5": {"M": 10000, 'fg_lambda':10., 'fg_decay': True, **hyper_params},
-    "VIDS_sample_solution_hyper_reset": {"M": 10000, **hyper_reset_params},
-    "FGTS": {"fg_lambda": 1},
-    "VIDS_sample_sgmcmc": {"M": 10000},
-    "VIDS_sample_sgmcmc_fg": {"M": 10000, "fg_lambda": 1},
-    "VIDS_sample_sgmcmc_fg01": {"M": 10000},
+    "TS":                {},
+    "TS_hyper":          {**hyper_params, 'fg_lambda':0.0,},
+    "TS_hyper:Reset":    {**hyper_params, 'fg_lambda':0.0, 'reset':True, 'update_num': args.repeat_num},
+    "TS_hyper:FG":       {**hyper_params, 'fg_decay': False},
+    "TS_hyper:FG Decay": {**hyper_params},
+
+    "VIDS_action":                {"M": 10000},
+    "VIDS_action_hyper":          {"M": 10000, **hyper_params, 'fg_lambda':0.0},
+    "VIDS_action_hyper:Reset":    {"M": 10000, **hyper_params, 'fg_lambda':0.0, 'reset':True, 'update_num': args.repeat_num},
+    "VIDS_action_hyper:FG":       {"M": 10000, **hyper_params, 'fg_decay': False},
+    "VIDS_action_hyper:FG Decay": {"M": 10000, **hyper_params},
+
+    "VIDS_policy":                {"M": 10000},
+    "VIDS_policy_hyper":          {"M": 10000, **hyper_params, 'fg_lambda':0.0},
+    "VIDS_policy_hyper:Reset":    {"M": 10000, **hyper_params, 'fg_lambda':0.0, 'reset':True, 'update_num': args.repeat_num},
+    "VIDS_policy_hyper:FG":       {"M": 10000, **hyper_params, 'fg_decay': False},
+    "VIDS_policy_hyper:FG Decay": {"M": 10000, **hyper_params},
 }
 
 linear_methods = [
     "TS",
     "TS_hyper",
-    "TS_hyper:FG Decay",
-    "VIDS_sample",
-    "VIDS_sample_hyper",
-    "VIDS_sample_hyper:FG Decay",
-    "VIDS_sample_solution",
-    "VIDS_sample_solution_hyper",
-    "VIDS_sample_solution_hyper:FG Decay",
+    # "TS_hyper:Reset",
     # "TS_hyper:FG",
-    # "VIDS_sample_hyper:FG",
-    # "VIDS_sample_solution_hyper:FG",
-    # "TS_hyper:1",
-    # "TS_hyper:2",
-    # "TS_hyper:3",
-    # "TS_hyper:4",
-    # "TS_hyper:5",
-    # "VIDS_sample_hyper:1",
-    # "VIDS_sample_hyper:2",
-    # "VIDS_sample_hyper:3",
-    # "VIDS_sample_hyper:4",
-    # "VIDS_sample_hyper:5",
-    # "VIDS_sample_solution_hyper:1",
-    # "VIDS_sample_solution_hyper:2",
-    # "VIDS_sample_solution_hyper:3",
-    # "VIDS_sample_solution_hyper:4",
-    # "VIDS_sample_solution_hyper:5",
+    # "TS_hyper:FG Decay",
+    "VIDS_action",
+    "VIDS_action_hyper",
+    # "VIDS_action_hyper:Reset",
+    # "VIDS_action_hyper:FG",
+    # "VIDS_action_hyper:FG Decay",
+    "VIDS_policy",
+    "VIDS_policy_hyper",
+    # "VIDS_policy_hyper:Reset",
+    # "VIDS_policy_hyper:FG",
+    # "VIDS_policy_hyper:FG Decay",
 ]
 
 game_config = {
@@ -135,6 +104,7 @@ game_config = {
     'movieLens': {'n_features': 30, 'n_arms': 207, 'T': args.time_period},
     'Russo': {'n_features': 5, 'n_arms': 30, 'T': args.time_period},
     'Zhang': {'n_features': 100, 'n_arms': 10, 'T': args.time_period},
+    'Synthetic': {'n_features': 50, 'n_arms': 20, 'T': args.time_period, 'reward_version': 'v1'},
 }
 
 with open(os.path.join(path, "config.json"), "wt") as f:

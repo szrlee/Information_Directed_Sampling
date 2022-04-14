@@ -15,12 +15,14 @@ from FiniteContextLinMAB import (
     FiniteContextPaperLinModel,
     FiniteContextFreqPaperLinModel,
     FiniteContextLinMAB,
+    SyntheticNonlinModel,
 )
 from InfiniteContextLinMAB import (
     InfiniteContextPaperLinModel,
     InfiniteContextFreqPaperLinModel,
     InfiniteContextLinMAB,
 )
+from HyperMAB import HyperMAB
 from utils import (
     plotRegret,
     storeRegret,
@@ -139,17 +141,17 @@ def LinMAB_expe(
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
     if problem == 'movieLens':
-        models = [LinMAB(ColdStartMovieLensModel()) for _ in range(n_expe)]
+        models = [HyperMAB(ColdStartMovieLensModel()) for _ in range(n_expe)]
         log = True
         title = "Movie recommendation system - n_arm: 207 - n_features: 30"
     elif problem == 'Zhang':
-        models = [LinMAB(FGTSLinModel(n_features, n_arms)) for _ in range(n_expe)]
+        models = [HyperMAB(FGTSLinModel(n_features, n_arms)) for _ in range(n_expe)]
         log = False
         title = "Linear Gaussian Model (Zhang, 2021) - n_arms: {} - n_features: {}".format(n_arms, n_features)
     elif problem == 'FreqRusso':
         u = 1 / np.sqrt(5)
         models = [
-            LinMAB(FreqPaperLinModel(u, n_features, n_arms, sigma=10))
+            HyperMAB(FreqPaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         log = False
@@ -157,7 +159,7 @@ def LinMAB_expe(
     elif problem == 'Russo':
         u = 1 / np.sqrt(5)
         models = [
-            LinMAB(PaperLinModel(u, n_features, n_arms, sigma=10))
+            HyperMAB(PaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         log = False
@@ -188,6 +190,7 @@ def FiniteContextLinMAB_expe(
     colors,
     path,
     problem='FreqRusso',
+    reward_version='v1',
     doplot=True,
 ):
     """
@@ -207,22 +210,28 @@ def FiniteContextLinMAB_expe(
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
     if problem == 'Zhang':
-        models = [FiniteContextLinMAB(FiniteContextFGTSLinModel(n_context, n_features, n_arms)) for _ in range(n_expe)]
+        models = [HyperMAB(FiniteContextFGTSLinModel(n_context, n_features, n_arms)) for _ in range(n_expe)]
         title = "Linear Gaussian Model (Zhang, 2021) - n_arms: {} - n_features: {}".format(n_arms, n_features)
     elif problem == 'FreqRusso':
         u = 1 / np.sqrt(5)
         models = [
-            FiniteContextLinMAB(FiniteContextFreqPaperLinModel(u, n_context, n_features, n_arms, sigma=10))
+            HyperMAB(FiniteContextFreqPaperLinModel(u, n_context, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
     elif problem == 'Russo':
         u = 1 / np.sqrt(5)
         models = [
-            FiniteContextLinMAB(FiniteContextPaperLinModel(u, n_context, n_features, n_arms, sigma=10))
+            HyperMAB(FiniteContextPaperLinModel(u, n_context, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
+    elif problem == 'Synthetic':
+        models = [
+            HyperMAB(SyntheticNonlinModel(n_features, n_arms, reward_version=reward_version))
+            for _ in range(n_expe)
+        ]
+        title = f"Synthetic Gaussian Mode  - n_arms: {n_arms} - n_features: {n_features} - reward: {reward_version}"
     else:
         raise NotImplementedError
 
@@ -265,14 +274,14 @@ def InfiniteContextLinMAB_expe(
     if problem == 'FreqRusso':
         u = 1 / np.sqrt(5)
         models = [
-            InfiniteContextLinMAB(InfiniteContextFreqPaperLinModel(u, n_features, n_arms, sigma=10))
+            HyperMAB(InfiniteContextFreqPaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
     elif problem == 'Russo':
         u = 1 / np.sqrt(5)
         models = [
-            InfiniteContextLinMAB(InfiniteContextPaperLinModel(u, n_features, n_arms, sigma=10))
+            HyperMAB(InfiniteContextPaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)

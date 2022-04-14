@@ -22,118 +22,47 @@ cmap = {
     9: "cyan",
 }
 
-# mapping_methods_labels = {
-#     "KG": "KG",
-#     "Approx_KG_star": "Approximate KG*",
-#     "KG_star": "KG*",
-#     "IDS": "Exact IDS",
-#     "TS": "TS - Conjugacy",
-#     "TS_hyper": "TS - HyperModel",
-#     "TS_hyper_reset": "TS - HyperModel Reset",
-#     "TS_SGMCMC": "TS - SGMCMC" ,
-#     "FGTS": "Feel-Good TS - SGMCMC-FG_1e0",
-#     "FGTS01": "Feel-Good TS - SGMCMC-FG_1e-1",
-#     "BayesUCB": "Bayes UCB",
-#     "UCB_Tuned": "Tuned UCB",
-#     "LinUCB": "Linear UCB",
-#     "MOSS": "MOSS",
-#     "GPUCB": "GP-UCB",
-#     "Tuned_GPUCB": "Tuned GP-UCB",
-#     "VIDS_approx": "Grid V-IDS",
-#     "VIDS_sample": "Sample V-IDS - action Conjugacy",
-#     "VIDS_sample_hyper": "Sample V-IDS - action HyperModel",
-#     "VIDS_sample_hyper_reset": "Sample V-IDS - action HyperModel Reset",
-#     "VIDS_sample_solution": "Sample V-IDS - policy Conjugacy",
-#     "VIDS_sample_solution_hyper": "Sample V-IDS - policy HyperModel",
-#     "VIDS_sample_solution_hyper_reset": "Sample V-IDS - policy HyperModel Reset",
-#     "VIDS_sample_sgmcmc": "Sample V-IDS - SGMCMC",
-#     "VIDS_sample_sgmcmc_fg": "Sample V-IDS - SGMCMC-FG_1e0",
-#     "VIDS_sample_sgmcmc_fg01": "Sample V-IDS - SGMCMC-FG_1e-1",
-#     "IDS_approx": "Grid IDS",
-#     "IDS_sample": "Sample IDS",
-#     "UCB1": "UCB1",
-# }
 
 mapping_methods_labels = {
-    "TS": "TS - Conjugacy",
-    "TS_hyper": "TS - HyperModel",
-    "TS_hyper:FG": "TS - HyperModel FG",
+    "TS":                "TS - Conjugacy",
+    "TS_hyper":          "TS - HyperModel",
+    "TS_hyper:Reset":    "TS - HyperModel Reset",
+    "TS_hyper:FG":       "TS - HyperModel FG",
     "TS_hyper:FG Decay": "TS - HyperModel FG Decay",
-    "TS_hyper:1": "TS - HyperModel FG 1.0",
-    "TS_hyper:2": "TS - HyperModel FG 0.1",
-    "TS_hyper:3": "TS - HyperModel FG 0.01",
-    "TS_hyper:4": "TS - HyperModel FG Decay 1.0",
-    "TS_hyper:5": "TS - HyperModel FG Decay 10.0",
-    "VIDS_sample": "Sample V-IDS - action Conjugacy",
-    "VIDS_sample_hyper": "Sample V-IDS - action HyperModel",
-    "VIDS_sample_hyper:FG": "Sample V-IDS - action HyperModel FG",
-    "VIDS_sample_hyper:FG Decay": "Sample V-IDS - action HyperModel FG Decay",
-    "VIDS_sample_hyper:1": "Sample V-IDS - action HyperModel FG 1.0",
-    "VIDS_sample_hyper:2": "Sample V-IDS - action HyperModel FG 0.1",
-    "VIDS_sample_hyper:3": "Sample V-IDS - action HyperModel FG 0.01",
-    "VIDS_sample_hyper:4": "Sample V-IDS - action HyperModel FG Decay 1.0",
-    "VIDS_sample_hyper:5": "Sample V-IDS - action HyperModel FG Decay 10.0",
-    "VIDS_sample_solution": "Sample V-IDS - policy Conjugacy",
-    "VIDS_sample_solution_hyper": "Sample V-IDS - policy HyperModel",
-    "VIDS_sample_solution_hyper:FG": "Sample V-IDS - policy HyperModel FG",
-    "VIDS_sample_solution_hyper:FG Decay": "Sample V-IDS - policy HyperModel FG Decay",
-    "VIDS_sample_solution_hyper:1": "Sample V-IDS - policy HyperModel FG 1.0",
-    "VIDS_sample_solution_hyper:2": "Sample V-IDS - policy HyperModel FG 0.1",
-    "VIDS_sample_solution_hyper:3": "Sample V-IDS - policy HyperModel FG 0.01",
-    "VIDS_sample_solution_hyper:4": "Sample V-IDS - policy HyperModel FG Decay 1.0",
-    "VIDS_sample_solution_hyper:5": "Sample V-IDS - policy HyperModel FG Decay 10.0",
+
+    "VIDS_action":                "VIDS-action - Conjugacy",
+    "VIDS_action_hyper":          "VIDS-action - HyperModel",
+    "VIDS_action_hyper:Reset":    "VIDS-action - HyperModel Reset",
+    "VIDS_action_hyper:FG":       "VIDS-action - HyperModel FG",
+    "VIDS_action_hyper:FG Decay": "VIDS-action - HyperModel FG Decay",
+
+    "VIDS_policy":                "VIDS-policy - Conjugacy",
+    "VIDS_policy_hyper":          "VIDS-policy - HyperModel",
+    "VIDS_policy_hyper:Reset":    "VIDS-policy - HyperModel Reset",
+    "VIDS_policy_hyper:FG":       "VIDS-policy - HyperModel FG",
+    "VIDS_policy_hyper:FG Decay": "VIDS-policy - HyperModel FG Decay",
 }
+
 
 mapping_methods_colors = {
     "TS": "black",
     "TS_hyper": "green",
-    "TS_hyper:FG": "darkgray",
-    "TS_hyper:FG Decay": "rosybrown",
-    "TS_hyper:1": "darkgray",
-    "TS_hyper:2": "rosybrown",
-    "TS_hyper:3": "black",
-    "TS_hyper:4": "darkgray",
-    "TS_hyper:5": "rosybrown",
-    "VIDS_sample": "red",
-    "VIDS_sample_hyper": "blue",
-    "VIDS_sample_hyper:FG": "sienna",
-    "VIDS_sample_hyper:FG Decay": "maroon",
-    "VIDS_sample_hyper:1": "sienna",
-    "VIDS_sample_hyper:2": "maroon",
-    "VIDS_sample_hyper:3": "red",
-    "VIDS_sample_hyper:4": "sienna",
-    "VIDS_sample_hyper:5": "maroon",
-    "VIDS_sample_solution": "gold",
-    "VIDS_sample_solution_hyper": "purple",
-    "VIDS_sample_solution_hyper:FG": "yellowgreen",
-    "VIDS_sample_solution_hyper:FG Decay": "darkcyan",
-    "VIDS_sample_solution_hyper:1": "yellowgreen",
-    "VIDS_sample_solution_hyper:2": "darkcyan",
-    "VIDS_sample_solution_hyper:3": "gold",
-    "VIDS_sample_solution_hyper:4": "yellowgreen",
-    "VIDS_sample_solution_hyper:5": "darkcyan",
-}
+    "TS_hyper:Reset": "purple",
+    "TS_hyper:FG": "violet",
+    "TS_hyper:FG Decay": "darkpurple",
 
-# mapping_methods_colors = {
-#     "KG": "yellow",
-#     "Approx_KG_star": "orchid",
-#     "KG_star": "orchid",
-#     "IDS": "chartreuse",
-#     "TS": "blue",
-#     "FGTS": "brown",
-#     "TS_SGMCMC": "pink",
-#     "BayesUCB": "cyan",
-#     "UCB_Tuned": "red",
-#     "LinUCB": "yellow",
-#     "MOSS": "black",
-#     "GPUCB": "black",
-#     "Tuned_GPUCB": "red",
-#     "VIDS_approx": "purple",
-#     "VIDS_sample": "green",
-#     "IDS_approx": "chartreuse",
-#     "IDS_sample": "orange",
-#     "UCB1": "darkred",
-# }
+    "VIDS_action": "blue",
+    "VIDS_action_hyper": "red",
+    "VIDS_action_hyper:Reset": "brown",
+    "VIDS_action_hyper:FG": "salmon",
+    "VIDS_action_hyper:FG Decay": "darksalmon",
+
+    "VIDS_policy": "yellow",
+    "VIDS_policy_hyper": "grey",
+    "VIDS_policy_hyper:Reset": "pink",
+    "VIDS_policy_hyper:FG": "cyan",
+    "VIDS_policy_hyper:FG Decay": "darkcyan",
+}
 
 
 def labelColor(methods):
@@ -214,6 +143,7 @@ def storeRegret(models, methods, param_dic, n_expe, T):
             reward, regret = alg(*args)
             all_regrets[i, j, :] = np.cumsum(regret)
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
+
     for j, m in enumerate(methods):
         for i in range(n_expe):
             final_regrets[j, i] = all_regrets[j, i, -1]
@@ -222,6 +152,7 @@ def storeRegret(models, methods, param_dic, n_expe, T):
                 final_regrets[j, :].mean(),
                 final_regrets[j, :].std(),
             )
+
     min_regret = all_regrets.min(axis=1)
     max_regret = all_regrets.max(axis=1)
     std_regret = all_regrets.std(axis=1)

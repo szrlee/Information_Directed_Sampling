@@ -37,6 +37,9 @@ class ArmGaussianLinear(object):
     def n_actions(self):
         return self.features.shape[0]
 
+    def set_context(self):
+        pass
+
     def regret(self, reward, T):
         """
         Compute the regret of a single experiment

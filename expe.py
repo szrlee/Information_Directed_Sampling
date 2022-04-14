@@ -190,7 +190,6 @@ def FiniteContextLinMAB_expe(
     colors,
     path,
     problem='FreqRusso',
-    reward_version='v1',
     doplot=True,
 ):
     """
@@ -226,12 +225,18 @@ def FiniteContextLinMAB_expe(
             for _ in range(n_expe)
         ]
         title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
-    elif problem == 'Synthetic':
+    elif problem == 'Synthetic-v1':
         models = [
-            HyperMAB(SyntheticNonlinModel(n_features, n_arms, reward_version=reward_version))
+            HyperMAB(SyntheticNonlinModel(n_features, n_arms, reward_version='v1'))
             for _ in range(n_expe)
         ]
-        title = f"Synthetic Gaussian Mode  - n_arms: {n_arms} - n_features: {n_features} - reward: {reward_version}"
+        title = f"Synthetic Bandit Model  - n_arms: {n_arms} - n_features: {n_features} - reward: v1"
+    elif problem == 'Synthetic-v2':
+        models = [
+            HyperMAB(SyntheticNonlinModel(n_features, n_arms, reward_version='v2'))
+            for _ in range(n_expe)
+        ]
+        title = f"Synthetic Bandit Model  - n_arms: {n_arms} - n_features: {n_features} - reward: v2"
     else:
         raise NotImplementedError
 

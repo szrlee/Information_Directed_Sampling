@@ -23,5 +23,5 @@ python main.py --game ${game} --lr=${lr} \
     > ~/logs/${game}_${tag}_3.out 2> ~/logs/${game}_${tag}_3.err &
 echo "run $game $tag"
 
-# Zhang, FreqRusso, Russo, movieLens
+# Zhang, FreqRusso, Russo, movieLens, Synthetic-v1, Synthetic-v2
 # ps -ef | grep DeepSea | awk '{print $2}'| xargs kill -9

@@ -104,7 +104,8 @@ game_config = {
     'movieLens': {'n_features': 30, 'n_arms': 207, 'T': args.time_period},
     'Russo': {'n_features': 5, 'n_arms': 30, 'T': args.time_period},
     'Zhang': {'n_features': 100, 'n_arms': 10, 'T': args.time_period},
-    'Synthetic': {'n_features': 50, 'n_arms': 20, 'T': args.time_period, 'reward_version': 'v1'},
+    'Synthetic-v1': {'n_features': 50, 'n_arms': 20, 'T': args.time_period},
+    'Synthetic-v2': {'n_features': 50, 'n_arms': 20, 'T': args.time_period},
 }
 
 with open(os.path.join(path, "config.json"), "wt") as f:

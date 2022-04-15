@@ -14,6 +14,8 @@ class HyperMAB:
         )
         self.reward, self.eta = model.reward, model.eta
         self.prior_sigma = model.alg_prior_sigma
+        self.threshold = 0.999
+        self.store_IDS = False
 
     def set_context(self):
         self.model.set_context()

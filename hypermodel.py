@@ -95,7 +95,7 @@ class HyperLinear(nn.Module):
         elif x.shape[0] != z.shape[0]:
             # compute action value for one action set
             out = torch.mm(theta, x.T)
-            prior_out = torch.mm(prior_theta, x.T)
+            prior_out = torch.mm(prior_theta, prior_x.T)
         else:
             # compute predict reward in batch
             out = torch.mul(x, theta).sum(-1)
@@ -269,7 +269,7 @@ class HyperModel:
         buffer_shape = {
             's': (self.action_dim, self.feature_dim),
             'a': (),
-            'r': (1,),
+            'r': (),
             'z': (self.noise_dim, )
         }
         self.buffer = ReplayBuffer(self.buffer_size, buffer_shape)

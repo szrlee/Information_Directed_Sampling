@@ -77,7 +77,7 @@ class HyperMAB:
         model = HyperModel(
             noise_dim, self.n_a, self.d, hidden_sizes=hidden_sizes, prior_std=self.prior_sigma,
             fg_lambda=fg_lambda, fg_decay=fg_decay, lr=lr, batch_size=batch_size, optim=optim,
-            target_noise_coef=self.eta, norm_coef=norm_coef, reset=reset
+            target_noise_coef=self.eta, norm_coef=norm_coef, buffer_size=T, reset=reset
         )
 
         reward, expected_regret = np.zeros(T), np.zeros(T)
@@ -225,7 +225,7 @@ class HyperMAB:
         model = HyperModel(
             noise_dim, self.n_a, self.d, hidden_sizes=hidden_sizes, prior_std=self.prior_sigma,
             fg_lambda=fg_lambda, fg_decay=fg_decay, lr=lr, batch_size=batch_size, optim=optim,
-            target_noise_coef=self.eta, norm_coef=norm_coef, reset=reset,
+            target_noise_coef=self.eta, norm_coef=norm_coef, buffer_size=T, reset=reset,
         )
 
         reward, expected_regret = np.zeros(T), np.zeros(T)
@@ -280,7 +280,7 @@ class HyperMAB:
         model = HyperModel(
             noise_dim, self.n_a, self.d, hidden_sizes=hidden_sizes, prior_std=self.prior_sigma,
             fg_lambda=fg_lambda, fg_decay=fg_decay, lr=lr, batch_size=batch_size, optim=optim,
-            target_noise_coef=self.eta, norm_coef=norm_coef, reset=reset,
+            target_noise_coef=self.eta, norm_coef=norm_coef, buffer_size=T, reset=reset,
         )
 
         reward, expected_regret = np.zeros(T), np.zeros(T)

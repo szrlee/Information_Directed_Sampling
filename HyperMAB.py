@@ -164,6 +164,12 @@ class HyperMAB:
         v = np.dot(p_a, (E_a - E) ** 2)
         return delta, v, p_a
 
+    def computeVIDS_v3(self, value):
+        value_gap = np.max(value, axis=-1, keepdims=True) - value
+        delta = value_gap.mean(axis=0)
+        v = np.var(value, axis=0)
+        return delta, v
+
     def vids_sample_by_action(self, delta, v):
         arm = rd_argmax(-(delta ** 2) / (v + 1e-20))
         return arm
@@ -188,7 +194,7 @@ class HyperMAB:
         arm = np.random.choice(optim_index, p=[1 - optim_prob, optim_prob])
         return arm
 
-    def VIDS_action(self, T, M=10000):
+    def VIDS_action(self, T, M=10000, optim_action=True):
         """
         Implementation of V-IDS with approximation of integrals using MC sampling for Linear Bandits with multivariate
         normal prior
@@ -203,15 +209,17 @@ class HyperMAB:
             self.set_context()
             thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
             value = np.dot(thetas, self.features.T)
-            delta, v, p_a = self.computeVIDS_v2(value)
-            # delta, v, p_a = self.computeVIDS_v1(thetas)
+            if optim_action:
+                delta, v, p_a = self.computeVIDS_v2(value)
+            else:
+                delta, v = self.computeVIDS_v3(value)
             a_t = self.vids_sample_by_action(delta, v)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
         return reward, expected_regret
 
     def VIDS_action_hyper(
-        self, T, M=10000, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01,
+        self, T, M=10000, optim_action=True, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01,
         batch_size=32, hidden_sizes=(), optim='Adam', update_num=2, reset=False
     ):
         """
@@ -232,7 +240,10 @@ class HyperMAB:
         for t in range(T):
             self.set_context()
             value = model.predict(self.features, M)
-            delta, v, p_a = self.computeVIDS_v2(value)
+            if optim_action:
+                delta, v, p_a = self.computeVIDS_v2(value)
+            else:
+                delta, v = self.computeVIDS_v3(value)
             a_t = self.vids_sample_by_action(delta, v)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
@@ -243,7 +254,7 @@ class HyperMAB:
                 model.update()
         return reward, expected_regret
 
-    def VIDS_policy(self, T, M=10000):
+    def VIDS_policy(self, T, M=10000, optim_action=True):
         """
         Implementation of V-IDS with approximation of integrals using MC sampling for Linear Bandits with multivariate
         normal prior
@@ -258,15 +269,17 @@ class HyperMAB:
             self.set_context()
             thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
             value = np.dot(thetas, self.features.T)
-            delta, v, p_a = self.computeVIDS_v2(value)
-            # delta, v, p_a = self.computeVIDS_v1(thetas)
+            if optim_action:
+                delta, v, p_a = self.computeVIDS_v2(value)
+            else:
+                delta, v = self.computeVIDS_v3(value)
             a_t = self.vids_sample_by_policy(delta, v)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
         return reward, expected_regret
 
     def VIDS_policy_hyper(
-        self, T, M=10000, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01,
+        self, T, M=10000, optim_action=True, noise_dim=2, fg_lambda=1.0, fg_decay=True, lr=0.01,
         batch_size=32, hidden_sizes=(), optim='Adam', update_num=2, reset=False
     ):
         """
@@ -287,7 +300,10 @@ class HyperMAB:
         for t in range(T):
             self.set_context()
             value = model.predict(self.features, M)
-            delta, v, p_a = self.computeVIDS_v2(value)
+            if optim_action:
+                delta, v, p_a = self.computeVIDS_v2(value)
+            else:
+                delta, v = self.computeVIDS_v3(value)
             a_t = self.vids_sample_by_policy(delta, v)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)

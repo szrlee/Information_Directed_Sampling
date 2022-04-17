@@ -35,12 +35,16 @@ mapping_methods_labels = {
     "VIDS_action_hyper:Reset":    "VIDS-action - HyperModel Reset",
     "VIDS_action_hyper:FG":       "VIDS-action - HyperModel FG",
     "VIDS_action_hyper:FG Decay": "VIDS-action - HyperModel FG Decay",
+    "VIDS_action:theta":          "VIDS-action - Conjugacy theta",
+    "VIDS_action_hyper:theta":    "VIDS-action - HyperModel theta",
 
     "VIDS_policy":                "VIDS-policy - Conjugacy",
     "VIDS_policy_hyper":          "VIDS-policy - HyperModel",
     "VIDS_policy_hyper:Reset":    "VIDS-policy - HyperModel Reset",
     "VIDS_policy_hyper:FG":       "VIDS-policy - HyperModel FG",
     "VIDS_policy_hyper:FG Decay": "VIDS-policy - HyperModel FG Decay",
+    "VIDS_policy:theta":          "VIDS-policy - Conjugacy theta",
+    "VIDS_policy_hyper:theta":    "VIDS-policy - HyperModel theta",
 }
 
 
@@ -56,12 +60,16 @@ mapping_methods_colors = {
     "VIDS_action_hyper:Reset": "brown",
     "VIDS_action_hyper:FG": "salmon",
     "VIDS_action_hyper:FG Decay": "darksalmon",
+    "VIDS_action:theta": "brown",
+    "VIDS_action_hyper:theta": "salmon",
 
     "VIDS_policy": "yellow",
     "VIDS_policy_hyper": "grey",
     "VIDS_policy_hyper:Reset": "pink",
     "VIDS_policy_hyper:FG": "cyan",
     "VIDS_policy_hyper:FG Decay": "darkcyan",
+    "VIDS_policy:theta": "pink",
+    "VIDS_policy_hyper:theta": "cyan",
 }
 
 

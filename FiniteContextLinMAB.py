@@ -158,8 +158,10 @@ class FiniteContextFGTSLinModel(ArmGaussianLinear):
 
 class SyntheticNonlinModel:
     def __init__(self, n_features=50, n_actions=20, all_actions=100, eta=sqrt(0.1), sigma=1, reward_version='v1'):
-        self.prior_random = np.random.RandomState(2021)
-        self.reward_random = np.random.RandomState(2022)
+        prior_random_state = 0
+        reward_random_state = np.random.randint(1, 312414)
+        self.prior_random = np.random.RandomState(prior_random_state)
+        self.reward_random = np.random.RandomState(reward_random_state)
 
         # feture
         x = self.prior_random.randn(all_actions, n_features)

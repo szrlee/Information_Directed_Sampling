@@ -1,6 +1,7 @@
 """ Packages import """
 import numpy as np
 import torch
+import os
 
 # import jax.numpy as np
 
@@ -127,7 +128,7 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     plt.legend(loc='best')
     plt.savefig(path+"/regret.pdf")
 
-def storeRegret(models, methods, param_dic, n_expe, T):
+def storeRegret(models, methods, param_dic, n_expe, T, path):
     """
     Compute the experiment for all specified models and methods
     :param models: list of MAB
@@ -140,15 +141,20 @@ def storeRegret(models, methods, param_dic, n_expe, T):
     all_regrets = np.zeros((len(methods), n_expe, T))
     final_regrets = np.zeros((len(methods), n_expe))
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
+    os.makedirs(os.path.join(path, 'csv_data'), exist_ok=True)
     for i, m in enumerate(methods):
         set_seed(2022)
         alg_name = m.split(':')[0]
+        file_name = alg_name.replace(':', '_').replace(' ', '_').lower()
+        file = open(os.path.join(path, 'csv_data', f"{file_name}.csv"), 'w+t')
         for j in tqdm(range(n_expe)):
             model = models[j]
             alg = model.__getattribute__(alg_name)
-            args = inspect.getfullargspec(alg)[0][2:]
-            args = [T] + [param_dic[m][i] for i in args]
+            args = inspect.getfullargspec(alg)[0][3:]
+            args = [T, file] + [param_dic[m][i] for i in args]
             reward, regret = alg(*args)
+            file.write('\n')
+            file.flush()
             all_regrets[i, j, :] = np.cumsum(regret)
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
 

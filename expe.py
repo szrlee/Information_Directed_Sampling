@@ -170,7 +170,7 @@ def LinMAB_expe(
     #     for m in models:
     #         m.store_IDS = True
     print("Begin experiments on '{}'".format(title))
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
         plotRegret(labels, results, colors, title, path, log=log)
     # if track_ids:

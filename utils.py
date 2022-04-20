@@ -145,7 +145,7 @@ def storeRegret(models, methods, param_dic, n_expe, T, path):
     for i, m in enumerate(methods):
         set_seed(2022)
         alg_name = m.split(':')[0]
-        file_name = alg_name.replace(':', '_').replace(' ', '_').lower()
+        file_name = m.replace(':', '_').replace(' ', '_').lower()
         file = open(os.path.join(path, 'csv_data', f"{file_name}.csv"), 'w+t')
         for j in tqdm(range(n_expe)):
             model = models[j]

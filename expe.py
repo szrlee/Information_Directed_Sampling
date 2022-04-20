@@ -241,7 +241,7 @@ def FiniteContextLinMAB_expe(
         raise NotImplementedError
 
     print("Begin experiments on '{}'".format(title))
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
         plotRegret(labels, results, colors, title, path, log=False)
     return results
@@ -294,7 +294,7 @@ def InfiniteContextLinMAB_expe(
         raise NotImplementedError
 
     print("Begin experiments on '{}'".format(title))
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
         plotRegret(labels, results, colors, title, path, log=False)
     return results

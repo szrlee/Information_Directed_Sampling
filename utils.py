@@ -25,37 +25,42 @@ cmap = {
 
 
 mapping_methods_labels = {
-    "TS":                "TS - Conjugacy",
-    "TS_hyper":          "TS - HyperModel",
-    "TS_hyper:Reset":    "TS - HyperModel Reset",
-    "TS_hyper:FG":       "TS - HyperModel FG",
+    "LinUCB": "LinUCB",
+    "BayesUCB": "BayesUCB",
+    "GPUCB": "GPUCB",
+    "Tuned_GPUCB": "Tuned_GPUCB",
+    "TS": "TS - Conjugacy",
+    "TS_hyper": "TS - HyperModel",
+    "TS_hyper:Reset": "TS - HyperModel Reset",
+    "TS_hyper:FG": "TS - HyperModel FG",
     "TS_hyper:FG Decay": "TS - HyperModel FG Decay",
-
-    "VIDS_action":                "VIDS-action - Conjugacy",
-    "VIDS_action_hyper":          "VIDS-action - HyperModel",
-    "VIDS_action_hyper:Reset":    "VIDS-action - HyperModel Reset",
-    "VIDS_action_hyper:FG":       "VIDS-action - HyperModel FG",
+    "VIDS_action": "VIDS-action - Conjugacy",
+    "VIDS_action_hyper": "VIDS-action - HyperModel",
+    "VIDS_action_hyper:Reset": "VIDS-action - HyperModel Reset",
+    "VIDS_action_hyper:FG": "VIDS-action - HyperModel FG",
     "VIDS_action_hyper:FG Decay": "VIDS-action - HyperModel FG Decay",
-    "VIDS_action:theta":          "VIDS-action - Conjugacy theta",
-    "VIDS_action_hyper:theta":    "VIDS-action - HyperModel theta",
-
-    "VIDS_policy":                "VIDS-policy - Conjugacy",
-    "VIDS_policy_hyper":          "VIDS-policy - HyperModel",
-    "VIDS_policy_hyper:Reset":    "VIDS-policy - HyperModel Reset",
-    "VIDS_policy_hyper:FG":       "VIDS-policy - HyperModel FG",
+    "VIDS_action:theta": "VIDS-action - Conjugacy theta",
+    "VIDS_action_hyper:theta": "VIDS-action - HyperModel theta",
+    "VIDS_policy": "VIDS-policy - Conjugacy",
+    "VIDS_policy_hyper": "VIDS-policy - HyperModel",
+    "VIDS_policy_hyper:Reset": "VIDS-policy - HyperModel Reset",
+    "VIDS_policy_hyper:FG": "VIDS-policy - HyperModel FG",
     "VIDS_policy_hyper:FG Decay": "VIDS-policy - HyperModel FG Decay",
-    "VIDS_policy:theta":          "VIDS-policy - Conjugacy theta",
-    "VIDS_policy_hyper:theta":    "VIDS-policy - HyperModel theta",
+    "VIDS_policy:theta": "VIDS-policy - Conjugacy theta",
+    "VIDS_policy_hyper:theta": "VIDS-policy - HyperModel theta",
 }
 
 
 mapping_methods_colors = {
+    "LinUCB": "green",
+    "BayesUCB": "purple",
+    "GPUCB": "violet",
+    "Tuned_GPUCB": "blue",
     "TS": "black",
     "TS_hyper": "green",
     "TS_hyper:Reset": "purple",
     "TS_hyper:FG": "violet",
     "TS_hyper:FG Decay": "darkpurple",
-
     "VIDS_action": "blue",
     "VIDS_action_hyper": "red",
     "VIDS_action_hyper:Reset": "brown",
@@ -63,7 +68,6 @@ mapping_methods_colors = {
     "VIDS_action_hyper:FG Decay": "darksalmon",
     "VIDS_action:theta": "brown",
     "VIDS_action_hyper:theta": "salmon",
-
     "VIDS_policy": "yellow",
     "VIDS_policy_hyper": "grey",
     "VIDS_policy_hyper:Reset": "pink",
@@ -114,7 +118,7 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     :param colors: list, list of colors for the different curves
     :param title: string, plot's title
     """
-    mean_regret = regret['mean_regret']
+    mean_regret = regret["mean_regret"]
     plt.rcParams["figure.figsize"] = (8, 6)
     for i, l in enumerate(labels):
         c = cmap[i] if not colors else colors[i]
@@ -125,8 +129,9 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     plt.title(title)
     plt.ylabel("Cumulative regret")
     plt.xlabel("Time period")
-    plt.legend(loc='best')
-    plt.savefig(path+"/regret.pdf")
+    plt.legend(loc="best")
+    plt.savefig(path + "/regret.pdf")
+
 
 def storeRegret(models, methods, param_dic, n_expe, T, path):
     """
@@ -141,19 +146,19 @@ def storeRegret(models, methods, param_dic, n_expe, T, path):
     all_regrets = np.zeros((len(methods), n_expe, T))
     final_regrets = np.zeros((len(methods), n_expe))
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
-    os.makedirs(os.path.join(path, 'csv_data'), exist_ok=True)
+    os.makedirs(os.path.join(path, "csv_data"), exist_ok=True)
     for i, m in enumerate(methods):
         set_seed(2022)
-        alg_name = m.split(':')[0]
-        file_name = m.replace(':', '_').replace(' ', '_').lower()
-        file = open(os.path.join(path, 'csv_data', f"{file_name}.csv"), 'w+t')
+        alg_name = m.split(":")[0]
+        file_name = m.replace(":", "_").replace(" ", "_").lower()
+        file = open(os.path.join(path, "csv_data", f"{file_name}.csv"), "w+t")
         for j in tqdm(range(n_expe)):
             model = models[j]
             alg = model.__getattribute__(alg_name)
             args = inspect.getfullargspec(alg)[0][3:]
             args = [T, file] + [param_dic[m][i] for i in args]
             reward, regret = alg(*args)
-            file.write('\n')
+            file.write("\n")
             file.flush()
             all_regrets[i, j, :] = np.cumsum(regret)
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")

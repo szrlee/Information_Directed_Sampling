@@ -57,113 +57,21 @@ dir = f"{game.lower()}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}"
 path = os.path.expanduser(os.path.join("~/results/vids/", game, dir))
 os.makedirs(path, exist_ok=True)
 
-args.hidden_sizes = [args.hidden_size] * args.hidden_layer
-hyper_params = {
-    "noise_dim": args.noise_dim,
-    "lr": args.lr,
-    "batch_size": args.batch_size,
-    "optim": args.optim,
-    "hidden_sizes": args.hidden_sizes,
-    "update_num": args.update_num,
-    "fg_lambda": args.fg_lambda,
-    "fg_decay": True,
-    "reset": False,
-}
 
 param = {
     "TS": {},
-    "TS_hyper": {
-        **hyper_params,
-        "fg_lambda": 0.0,
-    },
-    "TS_hyper:Reset": {
-        **hyper_params,
-        "fg_lambda": 0.0,
-        "reset": True,
-        "update_num": args.repeat_num,
-    },
-    "TS_hyper:FG": {**hyper_params, "fg_decay": False},
-    "TS_hyper:FG Decay": {**hyper_params},
-    "VIDS_action": {"M": 10000, "optim_action": True},
-    "VIDS_action_hyper": {
-        "M": 10000,
-        "optim_action": True,
-        **hyper_params,
-        "fg_lambda": 0.0,
-    },
-    "VIDS_action_hyper:Reset": {
-        "M": 10000,
-        "optim_action": True,
-        **hyper_params,
-        "fg_lambda": 0.0,
-        "reset": True,
-        "update_num": args.repeat_num,
-    },
-    "VIDS_action_hyper:FG": {
-        "M": 10000,
-        "optim_action": True,
-        **hyper_params,
-        "fg_decay": False,
-    },
-    "VIDS_action_hyper:FG Decay": {"M": 10000, "optim_action": True, **hyper_params},
-    "VIDS_action:theta": {"M": 10000, "optim_action": False},
-    "VIDS_action_hyper:theta": {
-        "M": 10000,
-        "optim_action": False,
-        **hyper_params,
-        "fg_lambda": 0.0,
-    },
-    "VIDS_policy": {"M": 10000, "optim_action": True},
-    "VIDS_policy_hyper": {
-        "M": 10000,
-        "optim_action": True,
-        **hyper_params,
-        "fg_lambda": 0.0,
-    },
-    "VIDS_policy_hyper:Reset": {
-        "M": 10000,
-        "optim_action": True,
-        **hyper_params,
-        "fg_lambda": 0.0,
-        "reset": True,
-        "update_num": args.repeat_num,
-    },
-    "VIDS_policy_hyper:FG": {
-        "M": 10000,
-        "optim_action": True,
-        **hyper_params,
-        "fg_decay": False,
-    },
-    "VIDS_policy_hyper:FG Decay": {"M": 10000, "optim_action": True, **hyper_params},
-    "VIDS_policy:theta": {"M": 10000, "optim_action": False},
-    "VIDS_policy_hyper:theta": {
-        "M": 10000,
-        "optim_action": False,
-        **hyper_params,
-        "fg_lambda": 0.0,
-    },
+    "LinUCB": {"lbda": 10e-4, "alpha": 10e-1},
+    "BayesUCB": {},
+    "GPUCB": {},
+    "Tuned_GPUCB": {"c": 0.9},
 }
 
 methods = [
     "TS",
-    # "VIDS_action",
-    # "VIDS_policy",
-    # "VIDS_action:theta",
-    # "VIDS_policy:theta",
-    # "TS_hyper",
-    # "VIDS_action_hyper",
-    # "VIDS_policy_hyper",
-    # "VIDS_action_hyper:theta",
-    # "VIDS_policy_hyper:theta",
-    # "TS_hyper:Reset",
-    # "TS_hyper:FG",
-    # "TS_hyper:FG Decay",
-    # "VIDS_action_hyper:Reset",
-    # "VIDS_action_hyper:FG",
-    # "VIDS_action_hyper:FG Decay",
-    # "VIDS_policy_hyper:Reset",
-    # "VIDS_policy_hyper:FG",
-    # "VIDS_policy_hyper:FG Decay",
+    "LinUCB",
+    "BayesUCB",
+    "GPUCB",
+    "Tuned_GPUCB",
 ]
 
 game_config = {
@@ -171,8 +79,6 @@ game_config = {
     "movieLens": {"n_features": 30, "n_arms": 207, "T": args.time_period},
     "Russo": {"n_features": 5, "n_arms": 30, "T": args.time_period},
     "Zhang": {"n_features": 100, "n_arms": 10, "T": args.time_period},
-    "Synthetic-v1": {"n_features": 50, "n_arms": 20, "T": args.time_period},
-    "Synthetic-v2": {"n_features": 50, "n_arms": 20, "T": args.time_period},
 }
 
 with open(os.path.join(path, "config.json"), "wt") as f:
@@ -213,12 +119,7 @@ expe_params = {
     "problem": game,
     **game_config[game],
 }
-if args.n_context > 0:
-    lin = exp.FiniteContextHyperMAB_expe(n_context=args.n_context, **expe_params)
-elif args.n_context < 0:
-    lin = exp.InfiniteContextHyperMAB_expe(**expe_params)
-else:
-    lin = exp.HyperMAB_expe(**expe_params)
+lin = exp.LinMAB_expe(**expe_params)
 
 if store:
     pkl.dump(lin, open(os.path.join(path, "results.pkl"), "wb"))

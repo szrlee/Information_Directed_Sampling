@@ -262,7 +262,7 @@ def HyperMAB_expe(
     #     for m in models:
     #         m.store_IDS = True
     print("Begin experiments on '{}'".format(title))
-    results = storeRegret(models, methods, param_dic, n_expe, T, path)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=True)
     if doplot:
         plotRegret(labels, results, colors, title, path, log=log)
     # if track_ids:
@@ -350,7 +350,7 @@ def FiniteContextHyperMAB_expe(
         raise NotImplementedError
 
     print("Begin experiments on '{}'".format(title))
-    results = storeRegret(models, methods, param_dic, n_expe, T, path)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=True)
     if doplot:
         plotRegret(labels, results, colors, title, path, log=False)
     return results
@@ -407,7 +407,7 @@ def InfiniteContextHyperMAB_expe(
         raise NotImplementedError
 
     print("Begin experiments on '{}'".format(title))
-    results = storeRegret(models, methods, param_dic, n_expe, T, path)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=True)
     if doplot:
         plotRegret(labels, results, colors, title, path, log=False)
     return results

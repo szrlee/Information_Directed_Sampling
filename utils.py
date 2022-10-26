@@ -1,6 +1,5 @@
 """ Packages import """
 import numpy as np
-import torch
 import os
 
 # import jax.numpy as np
@@ -139,7 +138,7 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     plt.savefig(path + "/regret.pdf")
 
 
-def storeRegret(models, methods, param_dic, n_expe, T, path):
+def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
     """
     Compute the experiment for all specified models and methods
     :param models: list of MAB
@@ -154,7 +153,7 @@ def storeRegret(models, methods, param_dic, n_expe, T, path):
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
     os.makedirs(os.path.join(path, "csv_data"), exist_ok=True)
     for i, m in enumerate(methods):
-        set_seed(2022)
+        set_seed(2022, use_torch=use_torch)
         alg_name = m.split(":")[0]
         file_name = m.replace(":", "_").replace(" ", "_").lower()
         file = open(os.path.join(path, "csv_data", f"{file_name}.csv"), "w+t")
@@ -268,7 +267,14 @@ def build_bernoulli_finite_set(L, K):
     return p, q, r
 
 
-def set_seed(seed):
+def set_seed(seed, use_torch=False):
     np.random.seed(seed)
-    torch.manual_seed(seed)
     rd.seed(seed)
+    if use_torch:
+        import torch
+
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            torch.cuda.manual_seed(seed)

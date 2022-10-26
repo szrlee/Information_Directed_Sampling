@@ -1,8 +1,10 @@
 # %%
 """ Packages import """
+import os, sys
+
+sys.path.append(os.getcwd())
 import json
 import argparse
-import os
 import expe as exp
 import numpy as np
 
@@ -46,6 +48,7 @@ def get_args():
     parser.add_argument("--n-context", type=int, default=-1)
     parser.add_argument("--optim", type=str, default="Adam", choices=["Adam", "SGD"])
     parser.add_argument("--norm-noise", type=int, default=0, choices=[0, 1])
+    parser.add_argument("--logdir", type=str, default="~/results/bandit")
     args = parser.parse_known_args()[0]
     return args
 
@@ -54,7 +57,7 @@ args = get_args()
 game = args.game
 now = datetime.now()
 dir = f"{game.lower()}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}"
-path = os.path.expanduser(os.path.join("~/results/vids/", game, dir))
+path = os.path.expanduser(os.path.join(args.logdir, game, dir))
 os.makedirs(path, exist_ok=True)
 
 args.hidden_sizes = [args.hidden_size] * args.hidden_layer

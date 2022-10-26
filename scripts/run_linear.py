@@ -1,8 +1,10 @@
 # %%
 """ Packages import """
+import os, sys
+
+sys.path.append(os.getcwd())
 import json
 import argparse
-import os
 import expe as exp
 import numpy as np
 
@@ -54,6 +56,7 @@ param = {
     "BayesUCB": {},
     "GPUCB": {},
     "Tuned_GPUCB": {"c": 0.9},
+    "VIDS_sample": {"M": 10000},
 }
 
 methods = [
@@ -62,6 +65,7 @@ methods = [
     "BayesUCB",
     "GPUCB",
     "Tuned_GPUCB",
+    "VIDS_sample",
 ]
 
 game_config = {

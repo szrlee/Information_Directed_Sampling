@@ -1,8 +1,10 @@
 # %%
 """ Packages import """
+import os, sys
+
+sys.path.append(os.getcwd())
 import json
 import argparse
-import os
 import expe as exp
 import numpy as np
 
@@ -32,7 +34,7 @@ from datetime import datetime
 def get_args():
     parser = argparse.ArgumentParser()
     # environment config
-    parser.add_argument("--game", type=str, default="Bernoulli")
+    parser.add_argument("--game", type=str, default="Gussian")
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
     parser.add_argument("--n-arms", type=int, default=10)
@@ -51,16 +53,24 @@ os.makedirs(path, exist_ok=True)
 
 param = {
     "TS": {},
-    "BayesUCB": {"p1": 0.01, "p2": 0.1, "c": 0},
+    "BayesUCB": {},
+    "GPUCB": {},
+    "Tuned_GPUCB": {"c": 0.9},
     "KG": {},
-    "IDS_approx": {"N": 1000, "display_results": False},
+    "KG_star": {},
+    "VIDS_approx": {"rg": 10.0, "N": 10000},
+    "VIDS_sample": {"M": 10000},
 }
 
 methods = [
     "TS",
     "BayesUCB",
+    "GPUCB",
+    "Tuned_GPUCB",
     "KG",
-    "IDS_approx",
+    "KG_star",
+    "VIDS_approx",
+    "VIDS_sample",
 ]
 
 with open(os.path.join(path, "config.json"), "wt") as f:
@@ -100,7 +110,7 @@ expe_params = {
     "colors": colors,
     "path": path,
 }
-lin = exp.bernoulli_expe(**expe_params)
+lin = exp.gaussian_expe(**expe_params)
 
 if store:
     pkl.dump(lin, open(os.path.join(path, "results.pkl"), "wb"))

@@ -291,7 +291,7 @@ class BetaBernoulliMAB(GenericMAB):
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         m = np.zeros(self.nb_arms)
         for t in range(T):
             if t < self.nb_arms:
@@ -312,8 +312,11 @@ class BetaBernoulliMAB(GenericMAB):
                         ta = Na[arm] * (mu[arm] - c[arm]) / (c[arm] + 10e-9)
                         m[arm] = ((1 - mu[arm]) ** ta) / ta
                 arm = rd_argmax(mu + (T - t) * m)
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
     def computeIDS(self, Maap, p_a, thetas, M, VIDS=False):
         """

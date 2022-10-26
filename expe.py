@@ -43,6 +43,7 @@ def bernoulli_expe(
     param_dic,
     labels,
     colors,
+    path,
     doplot=True,
     frequentist=False,
     track_ids=False,
@@ -69,16 +70,25 @@ def bernoulli_expe(
     if track_ids:
         for m in models:
             m.store_IDS = True
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
-        plotRegret(labels, results["mean_regret"], colors, "Binary rewards")
+        plotRegret(labels, results, colors, "Binary rewards", path)
     if track_ids:
         plot_IDS_results(T, n_expe, results["IDS_results"])
     return results
 
 
 def gaussian_expe(
-    n_expe, n_arms, T, methods, param_dic, labels, colors, doplot=True, track_ids=False
+    n_expe,
+    n_arms,
+    T,
+    methods,
+    param_dic,
+    labels,
+    colors,
+    path,
+    doplot=True,
+    track_ids=False,
 ):
     """
     Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
@@ -100,9 +110,9 @@ def gaussian_expe(
     if track_ids:
         for m in models:
             m.store_IDS = True
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
-        plotRegret(labels, results["mean_regret"], colors, "Gaussian rewards")
+        plotRegret(labels, results, colors, "Gaussian rewards", path)
     if track_ids:
         plot_IDS_results(T, n_expe, results["IDS_results"])
     return results

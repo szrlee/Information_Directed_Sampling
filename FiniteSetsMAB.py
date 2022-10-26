@@ -137,7 +137,7 @@ class FiniteSets(GenericMAB):
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, Y, arm_sequence = self.init_lists(T)
+        Sa, Na, Y, arm_sequence, expected_regret = self.init_lists(T)
         all_posterior = np.empty((T, self.L))
         reward = np.zeros(T)
         for t in range(T):
@@ -147,7 +147,7 @@ class FiniteSets(GenericMAB):
                 arm = self.IDSAction(delta, g)
             else:
                 arm = self.optimal_arm
-            self.update_lists(t, arm, Sa, Na, Y, arm_sequence)
+            self.update_lists(t, arm, Sa, Na, Y, arm_sequence, expected_regret)
             reward[t] = self.R[int(Y[t])]
             self.update_prior(arm, int(Y[t]))
             all_posterior[t] = self.prior

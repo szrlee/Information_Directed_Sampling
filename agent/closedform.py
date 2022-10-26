@@ -259,6 +259,7 @@ class LinMAB:
             file.flush()
         return reward, expected_regret
 
+    # TODO move sgld
     def SGLD_Sampler(self, X, y, n_samples, n_iters, fg_lambda):
         assert n_iters >= n_samples + 99
         # define model in JAX

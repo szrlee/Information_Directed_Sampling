@@ -84,8 +84,14 @@ def labelColor(methods):
     :param methods: list, list of methods
     :return: lists, labels and vectors
     """
-    labels = [mapping_methods_labels[m] for m in methods]
-    colors = [mapping_methods_colors[m] for m in methods]
+    labels = [
+        mapping_methods_labels[m] if m in mapping_methods_labels.keys() else m
+        for m in methods
+    ]
+    colors = [
+        mapping_methods_colors[m] if m in mapping_methods_colors.keys() else None
+        for m in methods
+    ]
     return labels, colors
 
 
@@ -121,7 +127,7 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     mean_regret = regret["mean_regret"]
     plt.rcParams["figure.figsize"] = (8, 6)
     for i, l in enumerate(labels):
-        c = cmap[i] if not colors else colors[i]
+        c = colors[i] or cmap[i]
         plt.plot(mean_regret[i], c=c, label=l)
         if log:
             plt.yscale("log")

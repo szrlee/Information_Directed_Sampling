@@ -51,13 +51,13 @@ class BetaBernoulliMAB(GenericMAB):
         beta2 = a1 * np.ones(self.nb_arms).astype(int)
         return beta1, beta2
 
-    def TS(self, T):
+    def TS(self, T, file):
         """
         Implementation of Thomson Sampling (TS) algorithm for Bernoulli Bandit Problems with beta prior
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         theta = np.zeros(self.nb_arms)
         for t in range(T):
             if t < self.nb_arms:
@@ -66,10 +66,13 @@ class BetaBernoulliMAB(GenericMAB):
                 for k in range(self.nb_arms):
                     theta[k] = np.random.beta(Sa[k] + 1, Na[k] - Sa[k] + 1)
                 arm = rd_argmax(theta)
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def BayesUCB(self, T, p1, p2, c=0):
+    def BayesUCB(self, T, file, p1, p2, c=0):
         """
         Implementation of Bayesian Upper Confidence Bounds (BayesUCB) algorithm for Bernoulli Bandit Problems
         with beta prior
@@ -79,7 +82,7 @@ class BetaBernoulliMAB(GenericMAB):
         :param c: float, parameter for the quantiles. Default value c=0
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         quantiles = np.zeros(self.nb_arms)
         for t in range(T):
             for k in range(self.nb_arms):
@@ -92,8 +95,11 @@ class BetaBernoulliMAB(GenericMAB):
                 else:
                     quantiles[k] = beta.ppf(1 - 1 / ((t + 1) * np.log(T) ** c), p1, p2)
             arm = rd_argmax(quantiles)
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
     def IR_approx(self, N, b1, b2, X, f, F, G, g):
         """
@@ -205,7 +211,7 @@ class BetaBernoulliMAB(GenericMAB):
         B[arm] = B[arm] * adjust / beta.sum()
         return f, F, G, B
 
-    def IDS_approx(self, T, N, display_results=False):
+    def IDS_approx(self, T, file, N, display_results=False):
         """
         Implementation of the Information Directed Sampling with approximation of integrals using a grid on [0, 1]
         for Bernoulli Bandit Problems with beta prior
@@ -214,7 +220,7 @@ class BetaBernoulliMAB(GenericMAB):
         :param display_results: boolean, if True displayed. Defaut False
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         beta1, beta2 = self.init_prior()
         X, f, F, G, B, maap, p_star, prod_F1, g = self.init_approx(N, beta1, beta2)
         for t in range(T):
@@ -231,16 +237,19 @@ class BetaBernoulliMAB(GenericMAB):
                     arm = self.IDSAction(delta, g)
             else:
                 arm = self.optimal_arm
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             prev_beta = np.array([copy(beta1[arm]), copy(beta2[arm])])
             # Posterior update
             beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1 - reward[t]
             if display_results:
-                utils.display_results(delta, g, delta ** 2 / g, p_star)
+                utils.display_results(delta, g, delta**2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
-        return reward, arm_sequence
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def KG(self, T):
+    def KG(self, T, file):
         """
         Implementation of Knowledge Gradient algorithm for Bernoulli Bandit Problems with beta prior
         as described in Ryzhov et al. (2010) 'The knowledge gradient algorithm for a general class of online
@@ -248,7 +257,7 @@ class BetaBernoulliMAB(GenericMAB):
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         v = np.zeros(self.nb_arms)
         for t in range(T):
             if t < self.nb_arms:
@@ -269,10 +278,13 @@ class BetaBernoulliMAB(GenericMAB):
                     else:
                         v[arm] = 0
                 arm = rd_argmax(mu + (T - t) * v)
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def Approx_KG_star(self, T):
+    def Approx_KG_star(self, T, file):
         """
         Implementation of Optimized Knowledge Gradient algorithm for Bernoulli Bandit Problems with beta prior
         as described in Kaminski (2015) 'Refined knowledge-gradient policy for learning probabilities'
@@ -342,7 +354,7 @@ class BetaBernoulliMAB(GenericMAB):
                         for a in range(self.nb_arms)
                     ]
                 )
-                arm = rd_argmax(-(delta ** 2) / v)
+                arm = rd_argmax(-(delta**2) / v)
             else:
                 g = np.array(
                     [
@@ -363,7 +375,7 @@ class BetaBernoulliMAB(GenericMAB):
                 arm = self.IDSAction(delta, g)
         return arm, p_a
 
-    def IDS_sample(self, T, M=10000, VIDS=False):
+    def IDS_sample(self, T, file, M=10000, VIDS=False):
         """
         Implementation of the Information Directed Sampling with approximation of integrals using MC sampling
         for Bernoulli Bandit Problems with beta prior
@@ -373,7 +385,7 @@ class BetaBernoulliMAB(GenericMAB):
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
         beta1, beta2 = self.init_prior()
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         Maap, p_a = np.zeros((self.nb_arms, self.nb_arms)), np.zeros(self.nb_arms)
         thetas = np.array(
             [np.random.beta(beta1[arm], beta2[arm], M) for arm in range(self.nb_arms)]
@@ -388,13 +400,16 @@ class BetaBernoulliMAB(GenericMAB):
                     arm, p_a = self.computeIDS(Maap, p_a, thetas, M, VIDS)
             else:
                 arm = self.optimal_arm
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             beta1[arm] += reward[t]
             beta2[arm] += 1 - reward[t]
             thetas[arm] = np.random.beta(beta1[arm], beta2[arm], M)
-        return reward, arm_sequence
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def VIDS_sample(self, T, M=10000, VIDS=True):
+    def VIDS_sample(self, T, file, M=10000, VIDS=True):
         """
         Implementation of the V-IDS with approximation of integrals using MC sampling
         for Bernoulli Bandit Problems with beta prior
@@ -403,7 +418,7 @@ class BetaBernoulliMAB(GenericMAB):
         :param VIDS: boolean, if True choose arm which delta**2/v quantity. Default: True
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         beta1, beta2 = self.init_prior()
         Maap, p_a = np.zeros((self.nb_arms, self.nb_arms)), np.zeros(self.nb_arms)
         thetas = np.array(
@@ -419,9 +434,12 @@ class BetaBernoulliMAB(GenericMAB):
                     arm, p_a = self.computeIDS(Maap, p_a, thetas, M, VIDS)
             else:
                 arm = self.optimal_arm
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             # Posterior update
             beta1[arm] += reward[t]
             beta2[arm] += 1 - reward[t]
             thetas[arm] = np.random.beta(beta1[arm], beta2[arm], M)
-        return reward, arm_sequence
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret

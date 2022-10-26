@@ -32,9 +32,10 @@ from datetime import datetime
 def get_args():
     parser = argparse.ArgumentParser()
     # environment config
-    parser.add_argument("--game", type=str, default="Russo")
+    parser.add_argument("--game", type=str, default="Bernoulli")
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
+    parser.add_argument("--n-arms", type=int, default=10)
     parser.add_argument("--logdir", type=str, default="~/results/bandit")
     args = parser.parse_known_args()[0]
     return args
@@ -50,26 +51,17 @@ os.makedirs(path, exist_ok=True)
 
 param = {
     "TS": {},
-    "LinUCB": {"lbda": 10e-4, "alpha": 10e-1},
-    "BayesUCB": {},
-    "GPUCB": {},
-    "Tuned_GPUCB": {"c": 0.9},
+    "BayesUCB": {"p1": 0.01, "p2": 0.1, "c": 0},
+    "KG": {},
+    "IDS_approx": {"N": 1000, "display_results": False},
 }
 
 methods = [
     "TS",
-    "LinUCB",
     "BayesUCB",
-    "GPUCB",
-    "Tuned_GPUCB",
+    "KG",
+    "IDS_approx",
 ]
-
-game_config = {
-    "FreqRusso": {"n_features": 5, "n_arms": 30, "T": args.time_period},
-    "movieLens": {"n_features": 30, "n_arms": 207, "T": args.time_period},
-    "Russo": {"n_features": 5, "n_arms": 30, "T": args.time_period},
-    "Zhang": {"n_features": 100, "n_arms": 10, "T": args.time_period},
-}
 
 with open(os.path.join(path, "config.json"), "wt") as f:
     methods_param = {method: param.get(method, "") for method in methods}
@@ -77,7 +69,6 @@ with open(os.path.join(path, "config.json"), "wt") as f:
         json.dumps(
             {
                 "methods_param": methods_param,
-                "game_config": game_config[game],
                 "user_config": vars(args),
                 "methods": methods,
                 "labels": utils.mapping_methods_labels,
@@ -100,16 +91,16 @@ check_time = False
 # Regret
 labels, colors = utils.labelColor(methods)
 expe_params = {
+    "T": args.time_period,
     "n_expe": args.n_expe,
+    "n_arms": args.n_arms,
     "methods": methods,
     "param_dic": param,
     "labels": labels,
     "colors": colors,
     "path": path,
-    "problem": game,
-    **game_config[game],
 }
-lin = exp.LinMAB_expe(**expe_params)
+lin = exp.bernoulli_expe(**expe_params)
 
 if store:
     pkl.dump(lin, open(os.path.join(path, "results.pkl"), "wb"))

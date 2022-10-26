@@ -131,7 +131,7 @@ if check_Linear:
         pkl.dump(lin, open(os.path.join(path, "lin10features.pkl"), "wb"))
 
 if check_time:
-    import LinMAB as LM
+    import agent.closedform as LM
 
     for i, j in zip([15, 30, 50, 100], [3, 5, 20, 30]):
         model = LM.PaperLinModel(u=np.sqrt(1 / 5), n_features=j, n_actions=i)

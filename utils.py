@@ -1,5 +1,7 @@
 """ Packages import """
 import numpy as np
+import torch
+import os
 
 # import jax.numpy as np
 
@@ -21,62 +23,59 @@ cmap = {
     9: "cyan",
 }
 
+
 mapping_methods_labels = {
-    "KG": "KG",
-    "Approx_KG_star": "Approximate KG*",
-    "KG_star": "KG*",
-    "IDS": "Exact IDS",
+    "LinUCB": "LinUCB",
+    "BayesUCB": "BayesUCB",
+    "GPUCB": "GPUCB",
+    "Tuned_GPUCB": "Tuned_GPUCB",
     "TS": "TS - Conjugacy",
-    "TS_SGMCMC": "TS - SGMCMC" ,
-    "FGTS": "Feel-Good TS - SGMCMC-FG_1e0",
-    "FGTS01": "Feel-Good TS - SGMCMC-FG_1e-1",
-    "BayesUCB": "Bayes UCB",
-    "UCB_Tuned": "Tuned UCB",
-    "LinUCB": "Linear UCB",
-    "MOSS": "MOSS",
-    "GPUCB": "GP-UCB",
-    "Tuned_GPUCB": "Tuned GP-UCB",
-    "VIDS_approx": "Grid V-IDS",
-    "VIDS_sample": "Sample V-IDS - Conjugacy",
-    "VIDS_sample_sgmcmc": "Sample V-IDS - SGMCMC",
-    "VIDS_sample_sgmcmc_fg": "Sample V-IDS - SGMCMC-FG_1e0",
-    "VIDS_sample_sgmcmc_fg01": "Sample V-IDS - SGMCMC-FG_1e-1",
-    "IDS_approx": "Grid IDS",
-    "IDS_sample": "Sample IDS",
-    "UCB1": "UCB1",
+    "TS_hyper": "TS - HyperModel",
+    "TS_hyper:Reset": "TS - HyperModel Reset",
+    "TS_hyper:FG": "TS - HyperModel FG",
+    "TS_hyper:FG Decay": "TS - HyperModel FG Decay",
+    "VIDS_action": "VIDS-action - Conjugacy",
+    "VIDS_action_hyper": "VIDS-action - HyperModel",
+    "VIDS_action_hyper:Reset": "VIDS-action - HyperModel Reset",
+    "VIDS_action_hyper:FG": "VIDS-action - HyperModel FG",
+    "VIDS_action_hyper:FG Decay": "VIDS-action - HyperModel FG Decay",
+    "VIDS_action:theta": "VIDS-action - Conjugacy theta",
+    "VIDS_action_hyper:theta": "VIDS-action - HyperModel theta",
+    "VIDS_policy": "VIDS-policy - Conjugacy",
+    "VIDS_policy_hyper": "VIDS-policy - HyperModel",
+    "VIDS_policy_hyper:Reset": "VIDS-policy - HyperModel Reset",
+    "VIDS_policy_hyper:FG": "VIDS-policy - HyperModel FG",
+    "VIDS_policy_hyper:FG Decay": "VIDS-policy - HyperModel FG Decay",
+    "VIDS_policy:theta": "VIDS-policy - Conjugacy theta",
+    "VIDS_policy_hyper:theta": "VIDS-policy - HyperModel theta",
 }
+
 
 mapping_methods_colors = {
-    "TS": "yellow",
-    "TS_SGMCMC": "orchid",
-    "FGTS": "green",
-    "FGTS01": "chartreuse",
-    "VIDS_sample": "blue",
-    "VIDS_sample_sgmcmc": "brown",
-    "VIDS_sample_sgmcmc_fg": "red",
-    "VIDS_sample_sgmcmc_fg01": "black",
+    "LinUCB": "green",
+    "BayesUCB": "purple",
+    "GPUCB": "violet",
+    "Tuned_GPUCB": "blue",
+    "TS": "black",
+    "TS_hyper": "green",
+    "TS_hyper:Reset": "purple",
+    "TS_hyper:FG": "violet",
+    "TS_hyper:FG Decay": "darkpurple",
+    "VIDS_action": "blue",
+    "VIDS_action_hyper": "red",
+    "VIDS_action_hyper:Reset": "brown",
+    "VIDS_action_hyper:FG": "salmon",
+    "VIDS_action_hyper:FG Decay": "darksalmon",
+    "VIDS_action:theta": "brown",
+    "VIDS_action_hyper:theta": "salmon",
+    "VIDS_policy": "yellow",
+    "VIDS_policy_hyper": "grey",
+    "VIDS_policy_hyper:Reset": "pink",
+    "VIDS_policy_hyper:FG": "cyan",
+    "VIDS_policy_hyper:FG Decay": "darkcyan",
+    "VIDS_policy:theta": "pink",
+    "VIDS_policy_hyper:theta": "cyan",
 }
-
-# mapping_methods_colors = {
-#     "KG": "yellow",
-#     "Approx_KG_star": "orchid",
-#     "KG_star": "orchid",
-#     "IDS": "chartreuse",
-#     "TS": "blue",
-#     "FGTS": "brown",
-#     "TS_SGMCMC": "pink",
-#     "BayesUCB": "cyan",
-#     "UCB_Tuned": "red",
-#     "LinUCB": "yellow",
-#     "MOSS": "black",
-#     "GPUCB": "black",
-#     "Tuned_GPUCB": "red",
-#     "VIDS_approx": "purple",
-#     "VIDS_sample": "green",
-#     "IDS_approx": "chartreuse",
-#     "IDS_sample": "orange",
-#     "UCB1": "darkred",
-# }
 
 
 def labelColor(methods):
@@ -85,8 +84,14 @@ def labelColor(methods):
     :param methods: list, list of methods
     :return: lists, labels and vectors
     """
-    labels = [mapping_methods_labels[m] for m in methods]
-    colors = [mapping_methods_colors[m] for m in methods]
+    labels = [
+        mapping_methods_labels[m] if m in mapping_methods_labels.keys() else m
+        for m in methods
+    ]
+    colors = [
+        mapping_methods_colors[m] if m in mapping_methods_colors.keys() else None
+        for m in methods
+    ]
     return labels, colors
 
 
@@ -111,7 +116,7 @@ def display_results(delta, g, ratio, p_star):
     print("p_star {}".format(p_star))
 
 
-def plotRegret(labels, mean_regret, colors, title, path, log=False):
+def plotRegret(labels, regret, colors, title, path, log=False):
     """
     Plot Bayesian regret
     :param labels: list, list of labels for the different curves
@@ -119,9 +124,10 @@ def plotRegret(labels, mean_regret, colors, title, path, log=False):
     :param colors: list, list of colors for the different curves
     :param title: string, plot's title
     """
+    mean_regret = regret["mean_regret"]
     plt.rcParams["figure.figsize"] = (8, 6)
     for i, l in enumerate(labels):
-        c = cmap[i] if not colors else colors[i]
+        c = colors[i] or cmap[i]
         plt.plot(mean_regret[i], c=c, label=l)
         if log:
             plt.yscale("log")
@@ -129,11 +135,11 @@ def plotRegret(labels, mean_regret, colors, title, path, log=False):
     plt.title(title)
     plt.ylabel("Cumulative regret")
     plt.xlabel("Time period")
-    plt.legend(loc='best')
-    plt.savefig(path+"/regret.pdf")
+    plt.legend(loc="best")
+    plt.savefig(path + "/regret.pdf")
 
 
-def storeRegret(models, methods, param_dic, n_expe, T):
+def storeRegret(models, methods, param_dic, n_expe, T, path):
     """
     Compute the experiment for all specified models and methods
     :param models: list of MAB
@@ -146,21 +152,22 @@ def storeRegret(models, methods, param_dic, n_expe, T):
     all_regrets = np.zeros((len(methods), n_expe, T))
     final_regrets = np.zeros((len(methods), n_expe))
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
-    for j in tqdm(range(n_expe)):
-        model = models[j]
-        for i, m in enumerate(methods):
-            alg = model.__getattribute__(m)
-            args = inspect.getfullargspec(alg)[0][2:]
-            args = [T] + [param_dic[m][i] for i in args]
-            # all_regrets[i, j, :] = model.regret(alg(*args)[0], T)
-            all_regrets[i, j, :] = model.expect_regret(alg(*args)[1], T)
-        print({m: round(all_regrets[i, j, -1], 1) for i, m in enumerate(methods)})
-        print(
-            {
-                m + "_bar": np.mean(all_regrets[i, : (j + 1), -1])
-                for i, m in enumerate(methods)
-            }
-        )
+    os.makedirs(os.path.join(path, "csv_data"), exist_ok=True)
+    for i, m in enumerate(methods):
+        set_seed(2022)
+        alg_name = m.split(":")[0]
+        file_name = m.replace(":", "_").replace(" ", "_").lower()
+        file = open(os.path.join(path, "csv_data", f"{file_name}.csv"), "w+t")
+        for j in tqdm(range(n_expe)):
+            model = models[j]
+            alg = model.__getattribute__(alg_name)
+            args = inspect.getfullargspec(alg)[0][3:]
+            args = [T, file] + [param_dic[m][i] for i in args]
+            reward, regret = alg(*args)
+            file.write("\n")
+            file.flush()
+            all_regrets[i, j, :] = np.cumsum(regret)
+        print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
 
     for j, m in enumerate(methods):
         for i in range(n_expe):
@@ -170,8 +177,15 @@ def storeRegret(models, methods, param_dic, n_expe, T):
                 final_regrets[j, :].mean(),
                 final_regrets[j, :].std(),
             )
+
+    min_regret = all_regrets.min(axis=1)
+    max_regret = all_regrets.max(axis=1)
+    std_regret = all_regrets.std(axis=1)
     mean_regret = all_regrets.mean(axis=1)
     results = {
+        "min_regret": min_regret,
+        "max_regret": max_regret,
+        "std_regret": std_regret,
         "mean_regret": mean_regret,
         "all_regrets": all_regrets,
         "final_regrets": final_regrets,
@@ -252,3 +266,9 @@ def build_bernoulli_finite_set(L, K):
     q[:, :, 0] = np.random.uniform(size=L * K).reshape((L, K))
     q[:, :, 1] = 1 - q[:, :, 0]
     return p, q, r
+
+
+def set_seed(seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    rd.seed(seed)

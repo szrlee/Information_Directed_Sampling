@@ -3,12 +3,23 @@ from MAB import GenericMAB
 from BernoulliMAB import BetaBernoulliMAB
 from GaussianMAB import GaussianMAB
 from FiniteSetsMAB import FiniteSets
-from LinMAB import (
+from agent.closedform import LinMAB
+from agent.hyper import HyperMAB
+from env.linear import (
     FGTSLinModel,
     PaperLinModel,
     FreqPaperLinModel,
     ColdStartMovieLensModel,
-    LinMAB,
+)
+from env.finitecontext import (
+    FiniteContextFGTSLinModel,
+    FiniteContextPaperLinModel,
+    FiniteContextFreqPaperLinModel,
+    SyntheticNonlinModel,
+)
+from env.infinitecontext import (
+    InfiniteContextPaperLinModel,
+    InfiniteContextFreqPaperLinModel,
 )
 from utils import (
     plotRegret,
@@ -32,6 +43,7 @@ def bernoulli_expe(
     param_dic,
     labels,
     colors,
+    path,
     doplot=True,
     frequentist=False,
     track_ids=False,
@@ -58,16 +70,25 @@ def bernoulli_expe(
     if track_ids:
         for m in models:
             m.store_IDS = True
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
-        plotRegret(labels, results["mean_regret"], colors, "Binary rewards")
+        plotRegret(labels, results, colors, "Binary rewards", path)
     if track_ids:
         plot_IDS_results(T, n_expe, results["IDS_results"])
     return results
 
 
 def gaussian_expe(
-    n_expe, n_arms, T, methods, param_dic, labels, colors, doplot=True, track_ids=False
+    n_expe,
+    n_arms,
+    T,
+    methods,
+    param_dic,
+    labels,
+    colors,
+    path,
+    doplot=True,
+    track_ids=False,
 ):
     """
     Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
@@ -89,9 +110,9 @@ def gaussian_expe(
     if track_ids:
         for m in models:
             m.store_IDS = True
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
-        plotRegret(labels, results["mean_regret"], colors, "Gaussian rewards")
+        plotRegret(labels, results, colors, "Gaussian rewards", path)
     if track_ids:
         plot_IDS_results(T, n_expe, results["IDS_results"])
     return results
@@ -107,7 +128,7 @@ def LinMAB_expe(
     labels,
     colors,
     path,
-    problem='FreqRusso',
+    problem="FreqRusso",
     doplot=True,
     # track_ids=False,
 ):
@@ -127,41 +148,268 @@ def LinMAB_expe(
     :param path: str
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
-    if problem == 'movieLens':
+    if problem == "movieLens":
         models = [LinMAB(ColdStartMovieLensModel()) for _ in range(n_expe)]
         log = True
         title = "Movie recommendation system - n_arm: 207 - n_features: 30"
-    elif problem == 'Zhang':
+    elif problem == "Zhang":
         models = [LinMAB(FGTSLinModel(n_features, n_arms)) for _ in range(n_expe)]
         log = False
-        title = "Linear Gaussian Model (Zhang, 2021) - n_arms: {} - n_features: {}".format(n_arms, n_features)
-    elif problem == 'FreqRusso':
+        title = (
+            "Linear Gaussian Model (Zhang, 2021) - n_arms: {} - n_features: {}".format(
+                n_arms, n_features
+            )
+        )
+    elif problem == "FreqRusso":
         u = 1 / np.sqrt(5)
         models = [
             LinMAB(FreqPaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         log = False
-        title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
-    elif problem == 'Russo':
+        title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    elif problem == "Russo":
         u = 1 / np.sqrt(5)
         models = [
             LinMAB(PaperLinModel(u, n_features, n_arms, sigma=10))
             for _ in range(n_expe)
         ]
         log = False
-        title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(n_arms, n_features)
+        title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
     else:
         raise NotImplementedError
     # if track_ids:
     #     for m in models:
     #         m.store_IDS = True
     print("Begin experiments on '{}'".format(title))
-    results = storeRegret(models, methods, param_dic, n_expe, T)
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
-        plotRegret(labels, results["mean_regret"], colors, title, path, log=log)
+        plotRegret(labels, results, colors, title, path, log=log)
     # if track_ids:
     #     plot_IDS_results(T, n_expe, results["IDS_results"])
+    return results
+
+
+def HyperMAB_expe(
+    n_expe,
+    n_features,
+    n_arms,
+    T,
+    methods,
+    param_dic,
+    labels,
+    colors,
+    path,
+    problem="FreqRusso",
+    doplot=True,
+    # track_ids=False,
+):
+    """
+    Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
+    experiments. Here we deal with n_arms Linear Gaussian Bandits with multivariate Gaussian prior
+    :param n_expe: int, number of experiments
+    :param n_features: int, dimension of feature vectors
+    :param n_arms: int, number of arms
+    :param T: int, time horizon
+    :param methods: list, algorithms to use
+    :param param_dic: dict, parameters associated to each algorithm (see main for formatting)
+    :param labels: list, labels for the curves
+    :param colors: list, colors for the curves
+    :param doplot: boolean, plot the curves or not
+    :param problem: str, choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
+    :param path: str
+    :return: dict, regrets, quantiles, means, stds of final regrets for each methods
+    """
+    if problem == "movieLens":
+        models = [HyperMAB(ColdStartMovieLensModel()) for _ in range(n_expe)]
+        log = True
+        title = "Movie recommendation system - n_arm: 207 - n_features: 30"
+    elif problem == "Zhang":
+        models = [HyperMAB(FGTSLinModel(n_features, n_arms)) for _ in range(n_expe)]
+        log = False
+        title = (
+            "Linear Gaussian Model (Zhang, 2021) - n_arms: {} - n_features: {}".format(
+                n_arms, n_features
+            )
+        )
+    elif problem == "FreqRusso":
+        u = 1 / np.sqrt(5)
+        models = [
+            HyperMAB(FreqPaperLinModel(u, n_features, n_arms, sigma=10))
+            for _ in range(n_expe)
+        ]
+        log = False
+        title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    elif problem == "Russo":
+        u = 1 / np.sqrt(5)
+        models = [
+            HyperMAB(PaperLinModel(u, n_features, n_arms, sigma=10))
+            for _ in range(n_expe)
+        ]
+        log = False
+        title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    else:
+        raise NotImplementedError
+    # if track_ids:
+    #     for m in models:
+    #         m.store_IDS = True
+    print("Begin experiments on '{}'".format(title))
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
+    if doplot:
+        plotRegret(labels, results, colors, title, path, log=log)
+    # if track_ids:
+    #     plot_IDS_results(T, n_expe, results["IDS_results"])
+    return results
+
+
+def FiniteContextHyperMAB_expe(
+    n_expe,
+    n_context,
+    n_features,
+    n_arms,
+    T,
+    methods,
+    param_dic,
+    labels,
+    colors,
+    path,
+    problem="FreqRusso",
+    doplot=True,
+):
+    """
+    Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
+    experiments. Here we deal with n_arms Linear Gaussian Bandits with multivariate Gaussian prior
+    :param n_expe: int, number of experiments
+    :param n_features: int, dimension of feature vectors
+    :param n_arms: int, number of arms
+    :param T: int, time horizon
+    :param methods: list, algorithms to use
+    :param param_dic: dict, parameters associated to each algorithm (see main for formatting)
+    :param labels: list, labels for the curves
+    :param colors: list, colors for the curves
+    :param doplot: boolean, plot the curves or not
+    :param problem: str, choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
+    :param path: str
+    :return: dict, regrets, quantiles, means, stds of final regrets for each methods
+    """
+    if problem == "Zhang":
+        models = [
+            HyperMAB(FiniteContextFGTSLinModel(n_context, n_features, n_arms))
+            for _ in range(n_expe)
+        ]
+        title = (
+            "Linear Gaussian Model (Zhang, 2021) - n_arms: {} - n_features: {}".format(
+                n_arms, n_features
+            )
+        )
+    elif problem == "FreqRusso":
+        u = 1 / np.sqrt(5)
+        models = [
+            HyperMAB(
+                FiniteContextFreqPaperLinModel(
+                    u, n_context, n_features, n_arms, sigma=10
+                )
+            )
+            for _ in range(n_expe)
+        ]
+        title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    elif problem == "Russo":
+        u = 1 / np.sqrt(5)
+        models = [
+            HyperMAB(
+                FiniteContextPaperLinModel(u, n_context, n_features, n_arms, sigma=10)
+            )
+            for _ in range(n_expe)
+        ]
+        title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    elif problem == "Synthetic-v1":
+        models = [
+            HyperMAB(SyntheticNonlinModel(n_features, n_arms, reward_version="v1"))
+            for _ in range(n_expe)
+        ]
+        title = f"Synthetic Bandit Model  - n_arms: {n_arms} - n_features: {n_features} - reward: v1"
+    elif problem == "Synthetic-v2":
+        models = [
+            HyperMAB(SyntheticNonlinModel(n_features, n_arms, reward_version="v2"))
+            for _ in range(n_expe)
+        ]
+        title = f"Synthetic Bandit Model  - n_arms: {n_arms} - n_features: {n_features} - reward: v2"
+    else:
+        raise NotImplementedError
+
+    print("Begin experiments on '{}'".format(title))
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
+    if doplot:
+        plotRegret(labels, results, colors, title, path, log=False)
+    return results
+
+
+def InfiniteContextHyperMAB_expe(
+    n_expe,
+    n_features,
+    n_arms,
+    T,
+    methods,
+    param_dic,
+    labels,
+    colors,
+    path,
+    problem="FreqRusso",
+    doplot=True,
+):
+    """
+    Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
+    experiments. Here we deal with n_arms Linear Gaussian Bandits with multivariate Gaussian prior
+    :param n_expe: int, number of experiments
+    :param n_features: int, dimension of feature vectors
+    :param n_arms: int, number of arms
+    :param T: int, time horizon
+    :param methods: list, algorithms to use
+    :param param_dic: dict, parameters associated to each algorithm (see main for formatting)
+    :param labels: list, labels for the curves
+    :param colors: list, colors for the curves
+    :param doplot: boolean, plot the curves or not
+    :param problem: str, choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
+    :param path: str
+    :return: dict, regrets, quantiles, means, stds of final regrets for each methods
+    """
+    if problem == "FreqRusso":
+        u = 1 / np.sqrt(5)
+        models = [
+            HyperMAB(InfiniteContextFreqPaperLinModel(u, n_features, n_arms, sigma=10))
+            for _ in range(n_expe)
+        ]
+        title = "Linear Gaussian Model (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    elif problem == "Russo":
+        u = 1 / np.sqrt(5)
+        models = [
+            HyperMAB(InfiniteContextPaperLinModel(u, n_features, n_arms, sigma=10))
+            for _ in range(n_expe)
+        ]
+        title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    else:
+        raise NotImplementedError
+
+    print("Begin experiments on '{}'".format(title))
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
+    if doplot:
+        plotRegret(labels, results, colors, title, path, log=False)
     return results
 
 

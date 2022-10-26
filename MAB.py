@@ -63,6 +63,12 @@ class GenericMAB:
         """
         return self.mu_max * np.arange(1, T + 1) - np.cumsum(reward)
 
+    def expect_regret(self, reward):
+        """
+        Compute the regret of a single step
+        """
+        return self.mu_max - reward
+
     def MC_regret(self, method, N, T, param_dic):
         """
         Implementation of Monte Carlo method to approximate the expectation of the regret
@@ -92,15 +98,16 @@ class GenericMAB:
                  - reward: np.array, rewards
                  - arm_sequence: np.array, arm chose at each step
         """
-        Sa, Na, reward, arm_sequence = (
+        Sa, Na, reward, arm_sequence, expected_regret = (
             np.zeros(self.nb_arms),
             np.zeros(self.nb_arms),
+            np.zeros(T),
             np.zeros(T),
             np.zeros(T),
         )
-        return Sa, Na, reward, arm_sequence
+        return Sa, Na, reward, arm_sequence, expected_regret
 
-    def update_lists(self, t, arm, Sa, Na, reward, arm_sequence):
+    def update_lists(self, t, arm, Sa, Na, reward, arm_sequence, expected_regret):
         """
         Update all the parameters of interest after choosing the correct arm
         :param t: int, current time/round
@@ -112,60 +119,70 @@ class GenericMAB:
         """
         Na[arm], arm_sequence[t], new_reward = Na[arm] + 1, arm, self.MAB[arm].sample()
         reward[t], Sa[arm] = new_reward, Sa[arm] + new_reward
+        expected_regret[t] = self.mu_max - new_reward
 
-    def RandomPolicy(self, T):
+    def RandomPolicy(self, T, file):
         """
         Implementation of a random policy consisting in randomly choosing one of the available arms. Only useful
         for checking that the behavior of the different policies is normal
         :param T:  int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         for t in range(T):
             arm = random.randint(0, self.nb_arms - 1)
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def ExploreCommit(self, T, m):
+    def ExploreCommit(self, T, file, m):
         """
         Implementation of Explore-then-Commit algorithm
         :param T: int, time horizon
         :param m: int, number of rounds before choosing the best action
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         for t in range(m * self.nb_arms):
             arm = t % self.nb_arms
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
         arm = np.argmax(Sa / Na)
         for t in range(m * self.nb_arms + 1, T):
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def UCB1(self, T, rho):
+    def UCB1(self, T, file, rho):
         """
         Implementation of UCB1 algorithm
         :param T: int, time horizon
         :param rho: float, parameter for balancing between exploration and exploitation
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         for t in range(T):
             if t < self.nb_arms:
                 arm = t
             else:
                 arm = rd_argmax(Sa / Na + rho * np.sqrt(np.log(t + 1) / 2 / Na))
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def UCB_Tuned(self, T):
+    def UCB_Tuned(self, T, file):
         """
         Implementation of UCB-tuned algorithm
         :param T: int, time horizon
         :param rho: float, parameter for balancing between exploration and exploitation
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         S, m = np.zeros(self.nb_arms), np.zeros(self.nb_arms)
         for t in range(T):
             if t < self.nb_arms:
@@ -173,23 +190,26 @@ class GenericMAB:
             else:
                 for arm in range(self.nb_arms):
                     S[arm] = (
-                        sum([r ** 2 for r in reward[np.where(arm_sequence == arm)]])
+                        sum([r**2 for r in reward[np.where(arm_sequence == arm)]])
                         / Na[arm]
                         - (Sa[arm] / Na[arm]) ** 2
                     )
                     m[arm] = min(0.25, S[arm] + np.sqrt(2 * np.log(t + 1) / Na[arm]))
                 arm = rd_argmax(Sa / Na + np.sqrt(np.log(t + 1) / Na * m))
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
-    def MOSS(self, T, rho):
+    def MOSS(self, T, file, rho):
         """
         Implementation of Minimax Optimal Strategy in the Stochastic case (MOSS).
         :param T: int, time horizon
         :param rho: float, parameter for balancing between exploration and exploitation
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        Sa, Na, reward, arm_sequence = self.init_lists(T)
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         for t in range(T):
             if t < self.nb_arms:
                 arm = t
@@ -198,8 +218,11 @@ class GenericMAB:
                     list(map(lambda x: max(x, 1), T / (self.nb_arms * Na)))
                 )
                 arm = rd_argmax(Sa / Na + rho * np.sqrt(4 / Na * np.log(root_term)))
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence)
-        return reward, arm_sequence
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+        return reward, expected_regret
 
     def IDSAction(self, delta, g):
         """
@@ -235,6 +258,6 @@ class GenericMAB:
             self.IDS_results["delta"].append(delta)
             self.IDS_results["g"].append(g)
             self.IDS_results["IR"].append(
-                np.inner(delta ** 2, policy) / np.inner(g, policy)
+                np.inner(delta**2, policy) / np.inner(g, policy)
             )
         return arm

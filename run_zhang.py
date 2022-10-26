@@ -44,6 +44,7 @@ param = {
     "IDS_sample": {"M": 10000, "VIDS": False}, # The parameter VIDS is only reserved for Bernoulli MAB
     "VIDS_approx": {"rg": 10.0, "N": 1000},
     "VIDS_sample": {"M": 10000, "VIDS": True}, # The parameter VIDS is only reserved for Bernoulli MAB
+    "VIDS_sample_hyper": {"M": 10000, 'noise_dim': 32, 'lr':0.01, 'batch_size': 32, 'update_num':2}, # The parameter VIDS is only reserved for Bernoulli MAB
     "FGTS": {"fg_lambda": 1},
     "VIDS_sample_sgmcmc": {"M": 10000},
     "VIDS_sample_sgmcmc_fg": {"M": 10000, "fg_lambda": 1},
@@ -57,6 +58,7 @@ linear_methods = [
     "FGTS",
     "FGTS01",
     "VIDS_sample",
+    "VIDS_sample_hyper",
     "VIDS_sample_sgmcmc",
     "VIDS_sample_sgmcmc_fg",
     "VIDS_sample_sgmcmc_fg01",

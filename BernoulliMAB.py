@@ -51,7 +51,7 @@ class BetaBernoulliMAB(GenericMAB):
         beta2 = a1 * np.ones(self.nb_arms).astype(int)
         return beta1, beta2
 
-    def TS(self, T, file):
+    def TS(self, T):
         """
         Implementation of Thomson Sampling (TS) algorithm for Bernoulli Bandit Problems with beta prior
         :param T: int, time horizon
@@ -67,12 +67,10 @@ class BetaBernoulliMAB(GenericMAB):
                     theta[k] = np.random.beta(Sa[k] + 1, Na[k] - Sa[k] + 1)
                 arm = rd_argmax(theta)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def BayesUCB(self, T, file, p1, p2, c=0):
+    def BayesUCB(self, T, p1, p2, c=0):
         """
         Implementation of Bayesian Upper Confidence Bounds (BayesUCB) algorithm for Bernoulli Bandit Problems
         with beta prior
@@ -96,9 +94,7 @@ class BetaBernoulliMAB(GenericMAB):
                     quantiles[k] = beta.ppf(1 - 1 / ((t + 1) * np.log(T) ** c), p1, p2)
             arm = rd_argmax(quantiles)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def IR_approx(self, N, b1, b2, X, f, F, G, g):
@@ -211,7 +207,7 @@ class BetaBernoulliMAB(GenericMAB):
         B[arm] = B[arm] * adjust / beta.sum()
         return f, F, G, B
 
-    def IDS_approx(self, T, file, N, display_results=False):
+    def IDS_approx(self, T, N, display_results=False):
         """
         Implementation of the Information Directed Sampling with approximation of integrals using a grid on [0, 1]
         for Bernoulli Bandit Problems with beta prior
@@ -244,12 +240,10 @@ class BetaBernoulliMAB(GenericMAB):
             if display_results:
                 utils.display_results(delta, g, delta**2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def KG(self, T, file):
+    def KG(self, T):
         """
         Implementation of Knowledge Gradient algorithm for Bernoulli Bandit Problems with beta prior
         as described in Ryzhov et al. (2010) 'The knowledge gradient algorithm for a general class of online
@@ -279,12 +273,10 @@ class BetaBernoulliMAB(GenericMAB):
                         v[arm] = 0
                 arm = rd_argmax(mu + (T - t) * v)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def Approx_KG_star(self, T, file):
+    def Approx_KG_star(self, T):
         """
         Implementation of Optimized Knowledge Gradient algorithm for Bernoulli Bandit Problems with beta prior
         as described in Kaminski (2015) 'Refined knowledge-gradient policy for learning probabilities'
@@ -313,9 +305,7 @@ class BetaBernoulliMAB(GenericMAB):
                         m[arm] = ((1 - mu[arm]) ** ta) / ta
                 arm = rd_argmax(mu + (T - t) * m)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def computeIDS(self, Maap, p_a, thetas, M, VIDS=False):
@@ -378,7 +368,7 @@ class BetaBernoulliMAB(GenericMAB):
                 arm = self.IDSAction(delta, g)
         return arm, p_a
 
-    def IDS_sample(self, T, file, M=10000, VIDS=False):
+    def IDS_sample(self, T, M=10000, VIDS=False):
         """
         Implementation of the Information Directed Sampling with approximation of integrals using MC sampling
         for Bernoulli Bandit Problems with beta prior
@@ -407,12 +397,10 @@ class BetaBernoulliMAB(GenericMAB):
             beta1[arm] += reward[t]
             beta2[arm] += 1 - reward[t]
             thetas[arm] = np.random.beta(beta1[arm], beta2[arm], M)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def VIDS_sample(self, T, file, M=10000, VIDS=True):
+    def VIDS_sample(self, T, M=10000, VIDS=True):
         """
         Implementation of the V-IDS with approximation of integrals using MC sampling
         for Bernoulli Bandit Problems with beta prior
@@ -442,7 +430,5 @@ class BetaBernoulliMAB(GenericMAB):
             beta1[arm] += reward[t]
             beta2[arm] += 1 - reward[t]
             thetas[arm] = np.random.beta(beta1[arm], beta2[arm], M)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret

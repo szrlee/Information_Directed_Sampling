@@ -55,15 +55,15 @@ class LinMAB:
         s_inv = np.linalg.inv(sigma)
         ffT = np.outer(f, f)
         mu_ = np.dot(
-            np.linalg.inv(s_inv + ffT / self.eta ** 2),
-            np.dot(s_inv, mu) + r * f / self.eta ** 2,
+            np.linalg.inv(s_inv + ffT / self.eta**2),
+            np.dot(s_inv, mu) + r * f / self.eta**2,
         )
-        sigma_ = np.linalg.inv(s_inv + ffT / self.eta ** 2)
+        sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
         return r, mu_, sigma_
 
     def rankone_update(self, f, Sigma):
         ffT = np.outer(f, f)
-        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta ** 2 + f @ Sigma @ f)
+        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta**2 + f @ Sigma @ f)
 
     def updatePosterior_(self, a, sigma, p):
         """
@@ -76,11 +76,11 @@ class LinMAB:
         """
         f, r = self.features[a], self.reward(a)[0]
         sigma_ = self.rankone_update(f, sigma)
-        p_ = p + ((r * f) / self.eta ** 2)
+        p_ = p + ((r * f) / self.eta**2)
         mu_ = sigma_ @ p_
         return r, mu_, sigma_, p_
 
-    def TS(self, T, file):
+    def TS(self, T):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
@@ -105,12 +105,10 @@ class LinMAB:
             # r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
 
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def ES(self, T, file, M=10):
+    def ES(self, T, M=10):
         """
         Ensemble sampling
         """
@@ -129,9 +127,6 @@ class LinMAB:
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             Sigma_t = self.rankone_update(f_t, Sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
             # Update M models with algorithmic random perturbation
             P_t += np.outer(
                 f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta ** 2
@@ -172,7 +167,7 @@ class LinMAB:
                 v[np.arange(M), :] = self.haar_matrix(M)
             return v[np.arange(N), :]
 
-    def IS(self, T, file, M=10, haar=False):
+    def IS(self, T, M=10, haar=False):
         """
         Index Sampling
         """
@@ -199,10 +194,6 @@ class LinMAB:
             r_t, mu_t, Sigma_t, p_t = self.updatePosterior_(a_t, Sigma_t, p_t)
             # compute regret
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            # store regret
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
             # Update A
             b_t = self.rand_vec_gen(M, haar=haar)
             P_t += np.outer(f_t, b_t) / self.eta
@@ -210,7 +201,7 @@ class LinMAB:
 
         return reward, expected_regret
 
-    def LinUCB(self, T, file, lbda=10e-4, alpha=10e-1):
+    def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """
         Implementation of Linear UCB algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
@@ -236,12 +227,10 @@ class LinMAB:
             a_t = rd_argmax(np.dot(self.features, theta_t) + beta_t)
             r_t = self.reward(a_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def BayesUCB(self, T, file):
+    def BayesUCB(self, T):
         """
         Implementation of Bayesian Upper Confidence Bounds (BayesUCB) algorithm for Linear Bandits with multivariate
         normal prior
@@ -261,12 +250,10 @@ class LinMAB:
             )
             r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def GPUCB(self, T, file):
+    def GPUCB(self, T):
         """
         Implementation of GPUCB, Srinivas (2010) 'Gaussian Process Optimization in the Bandit Setting: No Regret and
         Experimental Design' for Linear Bandits with multivariate normal prior
@@ -289,12 +276,10 @@ class LinMAB:
             )
             r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def Tuned_GPUCB(self, T, file, c=0.9):
+    def Tuned_GPUCB(self, T, c=0.9):
         """
         Implementation of Tuned GPUCB described in Russo & Van Roy's paper of study for Linear Bandits with
         multivariate normal prior
@@ -318,9 +303,7 @@ class LinMAB:
             )
             r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def computeVIDS(self, thetas):
@@ -370,10 +353,10 @@ class LinMAB:
         delta = np.array(
             [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
         )
-        arm = rd_argmax(-(delta ** 2) / (v + 1e-20))
+        arm = rd_argmax(-(delta**2) / (v + 1e-20))
         return arm, p_a
 
-    def VIDS_sample(self, T, file, M=10000):
+    def VIDS_sample(self, T, M=10000):
         """
         Implementation of V-IDS with approximation of integrals using MC sampling for Linear Bandits with multivariate
         normal prior
@@ -391,9 +374,7 @@ class LinMAB:
             r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             # r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     # TODO move sgld
@@ -402,7 +383,7 @@ class LinMAB:
         # define model in JAX
         def loglikelihood(theta, x, y):
             return -(
-                1 / (2 * (self.eta ** 2)) * (jnp.dot(x, theta) - y) ** 2
+                1 / (2 * (self.eta**2)) * (jnp.dot(x, theta) - y) ** 2
             ) + fg_lambda * jnp.max(jnp.dot(self.features, theta))
 
         def logprior(theta):
@@ -429,7 +410,7 @@ class LinMAB:
         # print(sample_idx)
         return thetas[sample_idx]
 
-    def FGTS(self, T, file, fg_lambda=1.0):
+    def FGTS(self, T, fg_lambda=1.0):
         """
         Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
@@ -456,28 +437,26 @@ class LinMAB:
             a_t = rd_argmax(np.dot(self.features, theta_t))
             r_t = self.reward(a_t)[0]
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def FGTS01(self, T, file):
+    def FGTS01(self, T):
         """
         Implementation of Feel-Good Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior and posterios sampling via SGMCMC
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        return self.FGTS(T, file, fg_lambda=10)
+        return self.FGTS(T, fg_lambda=10)
 
-    def TS_SGMCMC(self, T, file):
+    def TS_SGMCMC(self, T):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior and posterios sampling via SGMCMC
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        return self.FGTS(T, file, fg_lambda=0)
+        return self.FGTS(T, fg_lambda=0)
 
-    def VIDS_sample_sgmcmc_fg(self, T, file, M=10000, fg_lambda=1):
+    def VIDS_sample_sgmcmc_fg(self, T, M=10000, fg_lambda=1):
         """
         Implementation of V-IDS with approximation of integrals using SGMCMC sampling for Linear Bandits with multivariate
         normal prior
@@ -507,12 +486,10 @@ class LinMAB:
                 a_t, p_a = self.computeVIDS(thetas)
             r_t = self.reward(a_t)[0]
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def VIDS_sample_sgmcmc(self, T, file, M=10000):
+    def VIDS_sample_sgmcmc(self, T, M=10000):
         """
         Implementation of V-IDS with approximation of integrals using SGMCMC sampling for Linear Bandits with multivariate
         normal prior
@@ -520,9 +497,9 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        return self.VIDS_sample_sgmcmc_fg(T, file, M, 0)
+        return self.VIDS_sample_sgmcmc_fg(T, M, 0)
 
-    def VIDS_sample_sgmcmc_fg01(self, T, file, M=10000):
+    def VIDS_sample_sgmcmc_fg01(self, T, M=10000):
         """
         Implementation of V-IDS with approximation of integrals using SGMCMC sampling for Linear Bandits with multivariate
         normal prior
@@ -530,4 +507,4 @@ class LinMAB:
         :param M: int, number of samples. Default: 10 000
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        return self.VIDS_sample_sgmcmc_fg(T, file, M, 0.1)
+        return self.VIDS_sample_sgmcmc_fg(T, M, 0.1)

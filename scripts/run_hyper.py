@@ -48,7 +48,7 @@ def get_args():
     parser.add_argument("--n-context", type=int, default=-1)
     parser.add_argument("--optim", type=str, default="Adam", choices=["Adam", "SGD"])
     parser.add_argument("--norm-noise", type=int, default=0, choices=[0, 1])
-    parser.add_argument("--logdir", type=str, default="~/results/bandit")
+    parser.add_argument("--logdir", type=str, default="./results/bandit")
     args = parser.parse_known_args()[0]
     return args
 

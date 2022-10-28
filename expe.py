@@ -4,7 +4,6 @@ from BernoulliMAB import BetaBernoulliMAB
 from GaussianMAB import GaussianMAB
 from FiniteSetsMAB import FiniteSets
 from agent.closedform import LinMAB
-from agent.hyper import HyperMAB
 from env.linear import (
     FGTSLinModel,
     PaperLinModel,
@@ -224,6 +223,8 @@ def HyperMAB_expe(
     :param path: str
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
+    from agent.hyper import HyperMAB
+
     if problem == "movieLens":
         models = [HyperMAB(ColdStartMovieLensModel()) for _ in range(n_expe)]
         log = True
@@ -300,6 +301,7 @@ def FiniteContextHyperMAB_expe(
     :param path: str
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
+    from agent.hyper import HyperMAB
     if problem == "Zhang":
         models = [
             HyperMAB(FiniteContextFGTSLinModel(n_context, n_features, n_arms))
@@ -385,6 +387,8 @@ def InfiniteContextHyperMAB_expe(
     :param path: str
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
+    from agent.hyper import HyperMAB
+
     if problem == "FreqRusso":
         u = 1 / np.sqrt(5)
         models = [

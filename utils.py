@@ -6,6 +6,7 @@ import os
 
 import random as rd
 import matplotlib.pyplot as plt
+import scipy.stats as st
 from tqdm import tqdm
 import inspect
 
@@ -29,6 +30,9 @@ mapping_methods_labels = {
     "GPUCB": "GPUCB",
     "Tuned_GPUCB": "Tuned_GPUCB",
     "TS": "TS - Conjugacy",
+    "ES": "Ensemble Sampling",
+    "IS:Sphere": "Index Sampling: Sphere",
+    "IS:Haar": "Index Sampling: Haar",
     "TS_hyper": "TS - HyperModel",
     "TS_hyper:Reset": "TS - HyperModel Reset",
     "TS_hyper:FG": "TS - HyperModel FG",
@@ -56,6 +60,9 @@ mapping_methods_colors = {
     "GPUCB": "violet",
     "Tuned_GPUCB": "blue",
     "TS": "black",
+    "ES": "green",
+    "IS:Sphere": "red",
+    "IS:Haar": "blue",
     "TS_hyper": "green",
     "TS_hyper:Reset": "purple",
     "TS_hyper:FG": "violet",
@@ -123,19 +130,49 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     :param colors: list, list of colors for the different curves
     :param title: string, plot's title
     """
-    mean_regret = regret["mean_regret"]
-    plt.rcParams["figure.figsize"] = (8, 6)
+
+    all_regrets = regret['all_regrets']
+    mean_regret = regret['mean_regret']
+    # std_regret = regret['std_regret']
+    # min_regret = regret['min_regret']
+    # max_regret = regret['max_regret']
+    plt.figure(figsize = (10, 8), dpi=80)
+    # plt.rcParams["figure.figsize"] = (16, 9)
+    
+    T = mean_regret.shape[1]
+    print(T)
     for i, l in enumerate(labels):
-        c = colors[i] or cmap[i]
-        plt.plot(mean_regret[i], c=c, label=l)
+        # if 'TS' not in l:
+        #     continue
+        c = cmap[i] if not colors else colors[i]
+        x = np.arange(T)
+        low_CI_bound, high_CI_bound = st.t.interval(0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets[i]))
+        # low_CI_bound = np.quantile(all_regrets[i], 0.05, axis=0)
+        # high_CI_bound = np.quantile(all_regrets[i], 0.95, axis=0)
+        plt.plot(x, mean_regret[i], c=c, label=l)
+        plt.fill_between(x, low_CI_bound, high_CI_bound, color=c, alpha=0.2)
         if log:
             plt.yscale("log")
     plt.grid(color="grey", linestyle="--", linewidth=0.5)
     plt.title(title)
     plt.ylabel("Cumulative regret")
     plt.xlabel("Time period")
-    plt.legend(loc="best")
-    plt.savefig(path + "/regret.pdf")
+    plt.legend(loc='best')
+    plt.savefig(path+"/regret.pdf")
+
+    # mean_regret = regret["mean_regret"]
+    # plt.rcParams["figure.figsize"] = (8, 6)
+    # for i, l in enumerate(labels):
+    #     c = colors[i] or cmap[i]
+    #     plt.plot(mean_regret[i], c=c, label=l)
+    #     if log:
+    #         plt.yscale("log")
+    # plt.grid(color="grey", linestyle="--", linewidth=0.5)
+    # plt.title(title)
+    # plt.ylabel("Cumulative regret")
+    # plt.xlabel("Time period")
+    # plt.legend(loc="best")
+    # plt.savefig(path + "/regret.pdf")
 
 
 def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):

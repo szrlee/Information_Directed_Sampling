@@ -38,7 +38,7 @@ def get_args():
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
     parser.add_argument("--n-arms", type=int, default=10)
-    parser.add_argument("--logdir", type=str, default="~/results/bandit")
+    parser.add_argument("--logdir", type=str, default="./results/bandit")
     args = parser.parse_known_args()[0]
     return args
 

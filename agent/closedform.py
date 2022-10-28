@@ -4,6 +4,8 @@ import numpy as np
 # import jax.numpy as np
 from utils import rd_argmax
 from scipy.stats import norm
+from scipy.linalg import sqrtm
+# from scipy.stats import multivariate_normal
 
 import jax.numpy as jnp
 import jax.random as random
@@ -28,6 +30,8 @@ class LinMAB:
         # self.optimal_arm = None
         self.threshold = 0.999
         self.store_IDS = False
+        # Only for Haar matrix
+        self.counter = 0
 
     def initPrior(self):
         a0 = 0
@@ -50,11 +54,30 @@ class LinMAB:
         s_inv = np.linalg.inv(sigma)
         ffT = np.outer(f, f)
         mu_ = np.dot(
-            np.linalg.inv(s_inv + ffT / self.eta**2),
-            np.dot(s_inv, mu) + r * f / self.eta**2,
+            np.linalg.inv(s_inv + ffT / self.eta ** 2),
+            np.dot(s_inv, mu) + r * f / self.eta ** 2,
         )
-        sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
+        sigma_ = np.linalg.inv(s_inv + ffT / self.eta ** 2)
         return r, mu_, sigma_
+
+    def rankone_update(self, f, Sigma):
+        ffT = np.outer(f, f)
+        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta ** 2 + f @ Sigma @ f)
+
+    def updatePosterior_(self, a, sigma, p):
+        """
+        Update posterior mean and covariance matrix incrementally
+        without matrix inversion
+        :param arm: int, arm chose
+        :param sigma: np.array, posterior covariance matrix
+        :param p: np.array, sigma_inv mu
+        :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
+        """
+        f, r = self.features[a], self.reward(a)[0]
+        sigma_ = self.rankone_update(f, sigma)
+        p_ = p + ((r * f) / self.eta ** 2)
+        mu_ = sigma_ @ p_
+        return r, mu_, sigma_, p_
 
     def TS(self, T, file):
         """
@@ -64,18 +87,129 @@ class LinMAB:
         """
         reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
+        p_t = np.linalg.inv(sigma_t) @ mu_t
         for t in range(T):
-            # print(t)
-            # print(sigma_t)
-            # if np.isnan(mu_t, sigma_t).any():
-            #     print(mu_t, sigma_t)
-            theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
+            try:
+                theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
+            except:
+                try:
+                    # print(np.isnan(sigma_t).any(), np.isinf(sigma_t).any())
+                    z = np.random.normal(0, 1, self.d)
+                    theta_t = sqrtm(sigma_t) @ z + mu_t
+                except:
+                    print(np.isnan(sigma_t).any(), np.isinf(sigma_t).any())
+
+
             a_t = rd_argmax(np.dot(self.features, theta_t))
-            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
+            # r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             file.write(str(np.sum(expected_regret)))
             file.write(",")
             file.flush()
+        return reward, expected_regret
+
+    def ES(self, T, file, M=10):
+        """
+        Ensemble sampling
+        """
+        reward, expected_regret = np.zeros(T), np.zeros(T)
+        mu_t, Sigma_t = self.initPrior()
+        theta_t = np.zeros((self.d, M))
+        p_t = np.zeros((self.d, M))
+        for i in range(M):
+            theta_t[:, [i]] = np.random.multivariate_normal(mu_t, Sigma_t, 1).T
+            p_t[:, [i]] = np.linalg.inv(Sigma_t) @ theta_t[:, [i]]
+        for t in range(T):
+            i = np.random.choice(M, 1)[0]
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            Sigma_t = self.rankone_update(f_t, Sigma_t)
+            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+            # Update M models
+            for i in range(M):
+                # print(p_t[:, i].shape, r_t.shape, (f_t).shape)
+                p_t[:, i] = (
+                    p_t[:, i]
+                    + (r_t + np.random.normal(0, self.eta, 1)) * f_t / self.eta ** 2
+                )  # algorithmic random perturbation
+                theta_t[:, [i]] = Sigma_t @ p_t[:, [i]]
+        
+        return reward, expected_regret
+
+    def haar_matrix(self, M):
+        """
+            Haar random matrix generation
+        """
+        z = np.random.randn(M, M).astype(np.float32)
+        q, r = np.linalg.qr(z)
+        d = np.diag(r)
+        ph = d / np.abs(d)
+        return np.multiply(q, ph)
+
+    def rand_vec_gen(self, M, N=1, haar=False):
+        """
+            Random vector generation
+        """
+        assert(N>0)
+        if not haar:
+            v = np.random.randn(N, M).astype(np.float32)
+            v /= np.linalg.norm(v, axis=1, keepdims=True)
+            return v
+        # generate vectors from Haar random matrix
+        if N==1:
+            if self.counter == 0:
+                self.V = self.haar_matrix(M)
+            v = self.V[:, self.counter]
+            self.counter = (self.counter + 1) % M
+            return v
+        else:
+            v = np.zeros(( (N//M + 1)*M, M ))
+            for _ in range(N//M +1):
+                v[np.arange(M), :] = self.haar_matrix(M)
+            return v[np.arange(N), :]
+
+    def IS(self, T, file, M=10, haar=False):
+        """
+        Index Sampling
+        """
+        reward, expected_regret = np.zeros(T), np.zeros(T)
+        mu_t, Sigma_t = self.initPrior()
+        # Sample matrix B with size d x M
+        B = self.rand_vec_gen(M, N=self.d, haar=haar)
+        # print(B.shape, np.linalg.norm(B, axis=1))
+        A_t = sqrtm(Sigma_t) @ B
+        S_inv = np.linalg.inv(Sigma_t)
+        P_t = S_inv @ A_t
+        p_t = S_inv @ mu_t
+
+        for t in range(T):
+            # index sampling
+            z = np.random.normal(0, 1, M)
+            theta_t = A_t @ z + mu_t
+            # action selection
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            # selected feature and reward feedback
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            # incremental update on Sigma and mu
+            # Sigma_t = self.rankone_update(f_t, Sigma_t)
+            r_t, mu_t, Sigma_t, p_t = self.updatePosterior_(a_t, Sigma_t, p_t)
+            # compute regret
+            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+            # store regret
+            file.write(str(np.sum(expected_regret)))
+            file.write(",")
+            file.flush()
+            # Update A
+            b_t = self.rand_vec_gen(M, haar=haar)
+            P_t = P_t + np.outer(f_t, b_t) / self.eta
+            A_t = Sigma_t @ P_t
+
+        
         return reward, expected_regret
 
     def LinUCB(self, T, file, lbda=10e-4, alpha=10e-1):
@@ -118,6 +252,7 @@ class LinMAB:
         """
         reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
+        p_t = np.linalg.inv(sigma_t) @ mu_t
         for t in range(T):
             a_t = rd_argmax(
                 np.dot(self.features, mu_t)
@@ -126,7 +261,7 @@ class LinMAB:
                     np.diagonal(np.dot(np.dot(self.features, sigma_t), self.features.T))
                 )
             )
-            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             file.write(str(np.sum(expected_regret)))
             file.write(",")
@@ -142,6 +277,7 @@ class LinMAB:
         """
         reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
+        p_t = np.linalg.inv(sigma_t) @ mu_t
         for t in range(T):
             beta_t = 2 * np.log(self.n_a * ((t + 1) * np.pi) ** 2 / 6 / 0.1)
             a_t = rd_argmax(
@@ -153,7 +289,7 @@ class LinMAB:
                     )
                 )
             )
-            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             file.write(str(np.sum(expected_regret)))
             file.write(",")
@@ -170,6 +306,7 @@ class LinMAB:
         """
         reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, sigma_t = self.initPrior()
+        p_t = np.linalg.inv(sigma_t) @ mu_t
         for t in range(T):
             beta_t = c * np.log(t + 1)
             a_t = rd_argmax(
@@ -181,7 +318,7 @@ class LinMAB:
                     )
                 )
             )
-            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             file.write(str(np.sum(expected_regret)))
             file.write(",")
@@ -235,7 +372,7 @@ class LinMAB:
         delta = np.array(
             [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
         )
-        arm = rd_argmax(-(delta**2) / (v + 1e-20))
+        arm = rd_argmax(-(delta ** 2) / (v + 1e-20))
         return arm, p_a
 
     def VIDS_sample(self, T, file, M=10000):
@@ -248,11 +385,13 @@ class LinMAB:
         """
 
         mu_t, sigma_t = self.initPrior()
+        p_t = np.linalg.inv(sigma_t) @ mu_t
         reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
             thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
             a_t, p_a = self.computeVIDS(thetas)
-            r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
+            # r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             file.write(str(np.sum(expected_regret)))
             file.write(",")
@@ -265,7 +404,7 @@ class LinMAB:
         # define model in JAX
         def loglikelihood(theta, x, y):
             return -(
-                1 / (2 * (self.eta**2)) * (jnp.dot(x, theta) - y) ** 2
+                1 / (2 * (self.eta ** 2)) * (jnp.dot(x, theta) - y) ** 2
             ) + fg_lambda * jnp.max(jnp.dot(self.features, theta))
 
         def logprior(theta):

@@ -5,6 +5,7 @@ import numpy as np
 from utils import rd_argmax
 from scipy.stats import norm
 from scipy.linalg import sqrtm
+
 # from scipy.stats import multivariate_normal
 
 import jax.numpy as jnp
@@ -99,7 +100,6 @@ class LinMAB:
                 except:
                     print(np.isnan(sigma_t).any(), np.isinf(sigma_t).any())
 
-
             a_t = rd_argmax(np.dot(self.features, theta_t))
             r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
             # r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
@@ -116,13 +116,15 @@ class LinMAB:
         """
         reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, Sigma_t = self.initPrior()
-        theta_t = np.zeros((self.d, M))
-        p_t = np.zeros((self.d, M))
-        for i in range(M):
-            theta_t[:, [i]] = np.random.multivariate_normal(mu_t, Sigma_t, 1).T
-            p_t[:, [i]] = np.linalg.inv(Sigma_t) @ theta_t[:, [i]]
+        # A_t = np.zeros((self.d, M))
+        # P_t = np.zeros((self.d, M))
+        B = np.random.normal(0, 1, (self.d, M))
+        # print(B.shape, np.linalg.norm(B, axis=1))
+        A_t = mu_t.reshape((self.d, 1)) + sqrtm(Sigma_t) @ B
+        P_t = np.linalg.inv(Sigma_t) @ A_t
         for t in range(T):
             i = np.random.choice(M, 1)[0]
+            theta_t = A_t[:, [i]]
             a_t = rd_argmax(np.dot(self.features, theta_t))
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             Sigma_t = self.rankone_update(f_t, Sigma_t)
@@ -130,20 +132,17 @@ class LinMAB:
             file.write(str(np.sum(expected_regret)))
             file.write(",")
             file.flush()
-            # Update M models
-            for i in range(M):
-                # print(p_t[:, i].shape, r_t.shape, (f_t).shape)
-                p_t[:, i] = (
-                    p_t[:, i]
-                    + (r_t + np.random.normal(0, self.eta, 1)) * f_t / self.eta ** 2
-                )  # algorithmic random perturbation
-                theta_t[:, [i]] = Sigma_t @ p_t[:, [i]]
-        
+            # Update M models with algorithmic random perturbation
+            P_t += np.outer(
+                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta ** 2
+            )
+            A_t = Sigma_t @ P_t
+
         return reward, expected_regret
 
     def haar_matrix(self, M):
         """
-            Haar random matrix generation
+        Haar random matrix generation
         """
         z = np.random.randn(M, M).astype(np.float32)
         q, r = np.linalg.qr(z)
@@ -153,23 +152,23 @@ class LinMAB:
 
     def rand_vec_gen(self, M, N=1, haar=False):
         """
-            Random vector generation
+        Random vector generation
         """
-        assert(N>0)
+        assert N > 0
         if not haar:
             v = np.random.randn(N, M).astype(np.float32)
             v /= np.linalg.norm(v, axis=1, keepdims=True)
             return v
         # generate vectors from Haar random matrix
-        if N==1:
+        if N == 1:
             if self.counter == 0:
                 self.V = self.haar_matrix(M)
             v = self.V[:, self.counter]
             self.counter = (self.counter + 1) % M
             return v
         else:
-            v = np.zeros(( (N//M + 1)*M, M ))
-            for _ in range(N//M +1):
+            v = np.zeros(((N // M + 1) * M, M))
+            for _ in range(N // M + 1):
                 v[np.arange(M), :] = self.haar_matrix(M)
             return v[np.arange(N), :]
 
@@ -206,10 +205,9 @@ class LinMAB:
             file.flush()
             # Update A
             b_t = self.rand_vec_gen(M, haar=haar)
-            P_t = P_t + np.outer(f_t, b_t) / self.eta
+            P_t += np.outer(f_t, b_t) / self.eta
             A_t = Sigma_t @ P_t
 
-        
         return reward, expected_regret
 
     def LinUCB(self, T, file, lbda=10e-4, alpha=10e-1):

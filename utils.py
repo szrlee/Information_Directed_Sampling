@@ -1,6 +1,7 @@
 """ Packages import """
 import numpy as np
 import os
+import csv
 
 # import jax.numpy as np
 
@@ -26,6 +27,7 @@ cmap = {
 
 mapping_methods_labels = {
     "LinUCB": "LinUCB",
+    "LinUCB:test": "red-test",
     "BayesUCB": "BayesUCB",
     "GPUCB": "GPUCB",
     "Tuned_GPUCB": "Tuned_GPUCB",
@@ -56,6 +58,7 @@ mapping_methods_labels = {
 
 mapping_methods_colors = {
     "LinUCB": "green",
+    "LinUCB:test": "red",
     "BayesUCB": "purple",
     "GPUCB": "violet",
     "Tuned_GPUCB": "blue",
@@ -131,14 +134,14 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     :param title: string, plot's title
     """
 
-    all_regrets = regret['all_regrets']
-    mean_regret = regret['mean_regret']
+    all_regrets = regret["all_regrets"]
+    mean_regret = regret["mean_regret"]
     # std_regret = regret['std_regret']
     # min_regret = regret['min_regret']
     # max_regret = regret['max_regret']
-    plt.figure(figsize = (10, 8), dpi=80)
+    plt.figure(figsize=(10, 8), dpi=80)
     # plt.rcParams["figure.figsize"] = (16, 9)
-    
+
     T = mean_regret.shape[1]
     print(T)
     for i, l in enumerate(labels):
@@ -146,7 +149,9 @@ def plotRegret(labels, regret, colors, title, path, log=False):
         #     continue
         c = cmap[i] if not colors else colors[i]
         x = np.arange(T)
-        low_CI_bound, high_CI_bound = st.t.interval(0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets[i]))
+        low_CI_bound, high_CI_bound = st.t.interval(
+            0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets[i])
+        )
         # low_CI_bound = np.quantile(all_regrets[i], 0.05, axis=0)
         # high_CI_bound = np.quantile(all_regrets[i], 0.95, axis=0)
         plt.plot(x, mean_regret[i], c=c, label=l)
@@ -157,8 +162,8 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     plt.title(title)
     plt.ylabel("Cumulative regret")
     plt.xlabel("Time period")
-    plt.legend(loc='best')
-    plt.savefig(path+"/regret.pdf")
+    plt.legend(loc="best")
+    plt.savefig(path + "/regret.pdf")
 
     # mean_regret = regret["mean_regret"]
     # plt.rcParams["figure.figsize"] = (8, 6)
@@ -194,14 +199,15 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
         alg_name = m.split(":")[0]
         file_name = m.replace(":", "_").replace(" ", "_").lower()
         file = open(os.path.join(path, "csv_data", f"{file_name}.csv"), "w+t")
+        writer = csv.writer(file, delimiter=",")
         for j in tqdm(range(n_expe)):
             model = models[j]
             alg = model.__getattribute__(alg_name)
-            args = inspect.getfullargspec(alg)[0][3:]
-            args = [T, file] + [param_dic[m][i] for i in args]
+            args = inspect.getfullargspec(alg)[0][2:]
+            args = [T] + [param_dic[m][i] for i in args]
             reward, regret = alg(*args)
-            file.write("\n")
-            file.flush()
+            writer.writerow(np.cumsum(regret).astype(np.float32))
+            # writer.writerow(regret.astype(np.float32))
             all_regrets[i, j, :] = np.cumsum(regret)
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
 

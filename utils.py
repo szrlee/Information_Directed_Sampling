@@ -1,6 +1,7 @@
 """ Packages import """
 import numpy as np
 import os
+import csv
 
 # import jax.numpy as np
 
@@ -25,6 +26,7 @@ cmap = {
 
 mapping_methods_labels = {
     "LinUCB": "LinUCB",
+    "LinUCB:test": "red-test",
     "BayesUCB": "BayesUCB",
     "GPUCB": "GPUCB",
     "Tuned_GPUCB": "Tuned_GPUCB",
@@ -52,6 +54,7 @@ mapping_methods_labels = {
 
 mapping_methods_colors = {
     "LinUCB": "green",
+    "LinUCB:test": "red",
     "BayesUCB": "purple",
     "GPUCB": "violet",
     "Tuned_GPUCB": "blue",
@@ -157,14 +160,15 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
         alg_name = m.split(":")[0]
         file_name = m.replace(":", "_").replace(" ", "_").lower()
         file = open(os.path.join(path, "csv_data", f"{file_name}.csv"), "w+t")
+        writer = csv.writer(file, delimiter=",")
         for j in tqdm(range(n_expe)):
             model = models[j]
             alg = model.__getattribute__(alg_name)
             args = inspect.getfullargspec(alg)[0][3:]
-            args = [T, file] + [param_dic[m][i] for i in args]
+            args = [T] + [param_dic[m][i] for i in args]
             reward, regret = alg(*args)
-            file.write("\n")
-            file.flush()
+            writer.writerow(np.cumsum(regret).astype(np.float32))
+            # writer.writerow(regret.astype(np.float32))
             all_regrets[i, j, :] = np.cumsum(regret)
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
 

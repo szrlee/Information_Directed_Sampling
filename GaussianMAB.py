@@ -47,7 +47,7 @@ class GaussianMAB(GenericMAB):
         sigma[arm] = np.sqrt((eta * sigma[arm]) ** 2 / (eta**2 + sigma[arm] ** 2))
         return mu, sigma
 
-    def TS(self, T, file):
+    def TS(self, T):
         """
         Implementation of Thomson Sampling (TS) algorithm for Gaussian Bandit Problems with normal prior
         :param T: int, time horizon
@@ -68,12 +68,10 @@ class GaussianMAB(GenericMAB):
                 arm = rd_argmax(theta)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def BayesUCB(self, T, file):
+    def BayesUCB(self, T):
         """
         Implementation of Bayesian Upper Confidence Bounds (BayesUCB) algorithm for Gaussian Bandit Problems
         with normal prior
@@ -89,12 +87,10 @@ class GaussianMAB(GenericMAB):
                 arm = rd_argmax(mu + sigma * norm.ppf(t / (t + 1)))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def GPUCB(self, T, file):
+    def GPUCB(self, T):
         """
         Implementation of GPUCB, Srinivas (2010) 'Gaussian Process Optimization in the Bandit Setting: No Regret and
         Experimental Design' for Gaussian Bandit Problems with normal prior
@@ -108,12 +104,10 @@ class GaussianMAB(GenericMAB):
             arm = rd_argmax(mu + sigma * np.sqrt(beta))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def Tuned_GPUCB(self, T, file, c=0.9):
+    def Tuned_GPUCB(self, T, c=0.9):
         """
         Implementation of Tuned GPUCB described in Russo & Van Roy's paper of study for Gaussian Bandit Problems
         with normal prior
@@ -127,9 +121,7 @@ class GaussianMAB(GenericMAB):
             arm = rd_argmax(mu + sigma * np.sqrt(c * np.log(t + 1)))
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def kgf(self, x):
@@ -140,7 +132,7 @@ class GaussianMAB(GenericMAB):
         """
         return norm.cdf(x) * x + norm.pdf(x)
 
-    def KG(self, T, file):
+    def KG(self, T):
         """
         Implementation of Knowledge Gradient algorithm for Gaussian Bandit Problems with normal prior
         as described in Ryzhov et al. (2010) 'The knowledge gradient algorithm for a general class of online
@@ -167,12 +159,10 @@ class GaussianMAB(GenericMAB):
                 eta[arm] ** 2 + sigma[arm] ** 2
             )
             sigma[arm] = sigma_next[arm]
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
-    def KG_star(self, T, file):
+    def KG_star(self, T):
         """
         Implementation of Optimized Knowledge Gradient algorithm for Bernoulli Bandit Problems with normal prior
         as described in Kaminski (2015) 'Refined knowledge-gradient policy for learning probabilities'
@@ -211,9 +201,7 @@ class GaussianMAB(GenericMAB):
                 eta[arm] ** 2 + sigma[arm] ** 2
             )
             sigma[arm] = sigma_next[arm]
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def IR_approx(self, mu, sigma, X, f, F, N, p_star, maap):
@@ -294,7 +282,7 @@ class GaussianMAB(GenericMAB):
         F[arm] = norm.cdf(X, m, s)
         return f, F
 
-    def VIDS_approx(self, T, file, rg=10.0, N=10000):
+    def VIDS_approx(self, T, rg=10.0, N=10000):
         """
         Implementation of the V-IDS algorithm with approximation of integrals using a grid on [-10, 10]
         for Gaussian Bandit Problems with normal prior
@@ -326,9 +314,7 @@ class GaussianMAB(GenericMAB):
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
             f, F = self.update_approx(arm, mu[arm], sigma[arm], X, f, F)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def computeVIDS(self, Maap, p_a, thetas, M):
@@ -371,7 +357,7 @@ class GaussianMAB(GenericMAB):
             # arm = rd_argmax(-delta ** 2 / v)
         return arm, p_a
 
-    def VIDS_sample(self, T, file, M=10000):
+    def VIDS_sample(self, T, M=10000):
         """
         Implementation of V-IDS with approximation of integrals using MC sampling for Gaussian Bandit Problems
         with normal prior
@@ -399,7 +385,5 @@ class GaussianMAB(GenericMAB):
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
             thetas[arm] = np.random.normal(mu[arm], sigma[arm], M)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret

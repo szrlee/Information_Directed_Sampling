@@ -53,6 +53,7 @@ os.makedirs(path, exist_ok=True)
 param = {
     "TS": {},
     "LinUCB": {"lbda": 10e-4, "alpha": 10e-1},
+    "LinUCB:test": {"lbda": 10e-3, "alpha": 10e-1},
     "BayesUCB": {},
     "GPUCB": {},
     "Tuned_GPUCB": {"c": 0.9},
@@ -62,6 +63,7 @@ param = {
 methods = [
     "TS",
     "LinUCB",
+    "LinUCB:test",
     "BayesUCB",
     "GPUCB",
     "Tuned_GPUCB",

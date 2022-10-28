@@ -49,7 +49,7 @@ class HyperMAB:
         sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
         return r, mu_, sigma_
 
-    def TS(self, T, file):
+    def TS(self, T):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
@@ -63,9 +63,7 @@ class HyperMAB:
             a_t = rd_argmax(np.dot(self.features, theta_t))
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def TS_hyper(
@@ -112,9 +110,7 @@ class HyperMAB:
             a_t = rd_argmax(value)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
             transitions = {"s": self.features, "r": r_t, "a": a_t}
             model.put(transitions)
             # update hypermodel
@@ -217,7 +213,7 @@ class HyperMAB:
         arm = np.random.choice(optim_index, p=[1 - optim_prob, optim_prob])
         return arm
 
-    def VIDS_action(self, T, file, M=10000, optim_action=True):
+    def VIDS_action(self, T, M=10000, optim_action=True):
         """
         Implementation of V-IDS with approximation of integrals using MC sampling for Linear Bandits with multivariate
         normal prior
@@ -239,9 +235,7 @@ class HyperMAB:
             a_t = self.vids_sample_by_action(delta, v)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def VIDS_action_hyper(
@@ -296,9 +290,7 @@ class HyperMAB:
             a_t = self.vids_sample_by_action(delta, v)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
             transitions = {"s": self.features, "r": r_t, "a": a_t}
             model.put(transitions)
             # update hypermodel
@@ -306,7 +298,7 @@ class HyperMAB:
                 model.update()
         return reward, expected_regret
 
-    def VIDS_policy(self, T, file, M=10000, optim_action=True):
+    def VIDS_policy(self, T, M=10000, optim_action=True):
         """
         Implementation of V-IDS with approximation of integrals using MC sampling for Linear Bandits with multivariate
         normal prior
@@ -328,9 +320,7 @@ class HyperMAB:
             a_t = self.vids_sample_by_policy(delta, v)
             r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
         return reward, expected_regret
 
     def VIDS_policy_hyper(
@@ -385,9 +375,7 @@ class HyperMAB:
             a_t = self.vids_sample_by_policy(delta, v)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            file.write(str(np.sum(expected_regret)))
-            file.write(",")
-            file.flush()
+
             transitions = {"s": self.features, "r": r_t, "a": a_t}
             model.put(transitions)
             # update hypermodel

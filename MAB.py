@@ -1,8 +1,5 @@
 """ Packages import """
 import numpy as np
-
-# import jax.numpy as np
-
 import arms
 from tqdm import tqdm
 from utils import rd_argmax
@@ -184,7 +181,7 @@ class GenericMAB:
             else:
                 for arm in range(self.nb_arms):
                     S[arm] = (
-                        sum([r**2 for r in reward[np.where(arm_sequence == arm)]])
+                        sum([r ** 2 for r in reward[np.where(arm_sequence == arm)]])
                         / Na[arm]
                         - (Sa[arm] / Na[arm]) ** 2
                     )
@@ -248,6 +245,6 @@ class GenericMAB:
             self.IDS_results["delta"].append(delta)
             self.IDS_results["g"].append(g)
             self.IDS_results["IR"].append(
-                np.inner(delta**2, policy) / np.inner(g, policy)
+                np.inner(delta ** 2, policy) / np.inner(g, policy)
             )
         return arm

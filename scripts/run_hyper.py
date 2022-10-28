@@ -8,22 +8,10 @@ import argparse
 import expe as exp
 import numpy as np
 
-# import jax.numpy as np
 import pickle as pkl
 import utils
 import time
 
-import jax
-
-# import warnings
-# with warnings.catch_warnings():
-#     warnings.simplefilter("ignore", category=RuntimeWarning)
-#     mean = np.mean([])
-#     print(mean)
-
-# %%
-# Global flag to set a specific platform, must be used at startup.
-jax.config.update("jax_platform_name", "cpu")
 # random number generation setup
 np.random.seed(46)
 

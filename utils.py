@@ -3,8 +3,6 @@ import numpy as np
 import os
 import csv
 
-# import jax.numpy as np
-
 import random as rd
 import matplotlib.pyplot as plt
 import scipy.stats as st

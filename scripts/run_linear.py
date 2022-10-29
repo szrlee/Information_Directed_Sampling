@@ -53,7 +53,7 @@ os.makedirs(path, exist_ok=True)
 
 param = {
     "TS": {},
-    "ES": {"M": 100},
+    "ES": {"M": 20},
     "IS:Sphere": {"M": 100, "haar": False},
     "IS:Haar": {"M": 100, "haar": True},
     # "LinUCB": {"lbda": 10e-4, "alpha": 10e-1},
@@ -65,8 +65,8 @@ param = {
 
 methods = [
     # "TS",
-    # "ES",
-    "IS:Sphere",
+    "ES",
+    # "IS:Sphere",
     # "IS:Haar",
     # "LinUCB",
     # "BayesUCB",
@@ -78,7 +78,7 @@ methods = [
 game_config = {
     "FreqRusso": {"n_features": 5, "n_arms": 30, "T": args.time_period},
     "movieLens": {"n_features": 30, "n_arms": 207, "T": args.time_period},
-    "Russo": {"n_features": 50, "n_arms": 30, "T": args.time_period},
+    "Russo": {"n_features": 10, "n_arms": 30, "T": args.time_period},
     "Zhang": {"n_features": 100, "n_arms": 10, "T": args.time_period},
 }
 

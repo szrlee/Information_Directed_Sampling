@@ -190,8 +190,8 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
     :param T: Time horizon
     :return: Dictionnary with results from the experiments
     """
-    all_regrets = np.zeros((len(methods), n_expe, T))
-    final_regrets = np.zeros((len(methods), n_expe))
+    all_regrets = np.zeros((len(methods), n_expe, T), dtype=np.float32)
+    final_regrets = np.zeros((len(methods), n_expe), dtype=np.float32)
     q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
     os.makedirs(os.path.join(path, "csv_data"), exist_ok=True)
     for i, m in enumerate(methods):

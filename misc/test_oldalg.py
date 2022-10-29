@@ -2,7 +2,6 @@
 import expe as exp
 import numpy as np
 
-# import jax.numpy as np
 import pickle as pkl
 import os
 import utils

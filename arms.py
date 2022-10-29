@@ -1,8 +1,6 @@
 """ Packages import """
 import numpy as np
 
-# import jax.numpy as np
-
 
 class AbstractArm(object):
     def __init__(self, mean, variance, random_state):

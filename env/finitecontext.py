@@ -3,7 +3,7 @@ import numpy as np
 
 
 class ArmGaussianLinear(object):
-    def __init__(self, n_context, prior_random_state=2021, reward_random_state=2022):
+    def __init__(self, n_context, prior_random_state=2022, reward_random_state=2023):
         self.prior_random = np.random.RandomState(prior_random_state)
         self.reward_random = np.random.RandomState(reward_random_state)
         self.n_context = n_context
@@ -93,7 +93,7 @@ class FiniteContextFreqPaperLinModel(ArmGaussianLinear):
         """
         super(FiniteContextFreqPaperLinModel, self).__init__(
             n_context,
-            prior_random_state=0,
+            prior_random_state=2022,
             reward_random_state=np.random.randint(1, 312414),
         )
         self.eta = eta
@@ -118,7 +118,7 @@ class FiniteContextFGTSLinModel(ArmGaussianLinear):
         """
         super(FiniteContextFGTSLinModel, self).__init__(
             n_context,
-            prior_random_state=0,
+            prior_random_state=2022,
             reward_random_state=np.random.randint(1, 312414),
         )
         self.eta = eta
@@ -166,7 +166,7 @@ class SyntheticNonlinModel:
         sigma=1,
         reward_version="v1",
     ):
-        prior_random_state = 0
+        prior_random_state = 2022
         reward_random_state = np.random.randint(1, 312414)
         self.prior_random = np.random.RandomState(prior_random_state)
         self.reward_random = np.random.RandomState(reward_random_state)

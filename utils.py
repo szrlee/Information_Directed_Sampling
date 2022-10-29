@@ -206,7 +206,7 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
             reward, regret = alg(*args)
             writer.writerow(np.cumsum(regret).astype(np.float32))
             # writer.writerow(regret.astype(np.float32))
-            all_regrets[i, j, :] = np.cumsum(regret)
+            all_regrets[i, j, :] = np.cumsum(regret).astype(np.float32)
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
 
     for j, m in enumerate(methods):

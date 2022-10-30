@@ -2,7 +2,7 @@ import numpy as np
 
 
 class ArmGaussianLinear(object):
-    def __init__(self, prior_random_state=2021, reward_random_state=2022):
+    def __init__(self, prior_random_state=2022, reward_random_state=2023):
         self.prior_random = np.random.RandomState(prior_random_state)
         self.reward_random = np.random.RandomState(reward_random_state)
 
@@ -72,7 +72,7 @@ class PaperLinModel(ArmGaussianLinear):
 
 
 class FreqPaperLinModel(ArmGaussianLinear):
-    def __init__(self, u, n_features, n_actions, eta=1, sigma=10):
+    def __init__(self, u, n_features, n_actions, eta=10, sigma=10):
         """
         (Frequentist modification: use fixed random seed to sample arms, features and theta.)
         Initialization of the arms, features and theta in
@@ -85,7 +85,7 @@ class FreqPaperLinModel(ArmGaussianLinear):
         multivariate distribution N(0, sigma*I)
         """
         super(FreqPaperLinModel, self).__init__(
-            prior_random_state=0,
+            prior_random_state=2022,
             reward_random_state=np.random.randint(1, 312414),
         )
         self.eta = eta
@@ -106,7 +106,7 @@ class FGTSLinModel(ArmGaussianLinear):
         :param eta: float, std from the reward likelihood model N(a^T.theta, eta)
         """
         super(FGTSLinModel, self).__init__(
-            prior_random_state=0,
+            prior_random_state=2022,
             reward_random_state=np.random.randint(1, 312414),
         )
         self.eta = eta

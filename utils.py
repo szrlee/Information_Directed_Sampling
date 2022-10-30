@@ -189,8 +189,8 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
     :return: Dictionnary with results from the experiments
     """
     all_regrets = np.zeros((len(methods), n_expe, T))
-    final_regrets = np.zeros((len(methods), n_expe))
-    q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
+    # final_regrets = np.zeros((len(methods), n_expe))
+    # q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
     os.makedirs(os.path.join(path, "csv_data"), exist_ok=True)
     for i, m in enumerate(methods):
         set_seed(2022, use_torch=use_torch)
@@ -204,34 +204,33 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
             args = inspect.getfullargspec(alg)[0][2:]
             args = [T] + [param_dic[m][i] for i in args]
             reward, regret = alg(*args)
-            writer.writerow(np.cumsum(regret).astype(np.float32))
-            # writer.writerow(regret.astype(np.float32))
-            all_regrets[i, j, :] = np.cumsum(regret).astype(np.float32)
+            all_regrets[i, j, :] = np.cumsum(regret)
+            writer.writerow(all_regrets[i, j, :].astype(np.float32))
         print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
 
-    for j, m in enumerate(methods):
-        for i in range(n_expe):
-            final_regrets[j, i] = all_regrets[j, i, -1]
-            quantiles[m], means[m], std[m] = (
-                np.quantile(final_regrets[j, :], q),
-                final_regrets[j, :].mean(),
-                final_regrets[j, :].std(),
-            )
+    # for j, m in enumerate(methods):
+    #     for i in range(n_expe):
+    #         final_regrets[j, i] = all_regrets[j, i, -1]
+    #         quantiles[m], means[m], std[m] = (
+    #             np.quantile(final_regrets[j, :], q),
+    #             final_regrets[j, :].mean(),
+    #             final_regrets[j, :].std(),
+    #         )
 
-    min_regret = all_regrets.min(axis=1)
-    max_regret = all_regrets.max(axis=1)
-    std_regret = all_regrets.std(axis=1)
+    # min_regret = all_regrets.min(axis=1)
+    # max_regret = all_regrets.max(axis=1)
+    # std_regret = all_regrets.std(axis=1)
     mean_regret = all_regrets.mean(axis=1)
     results = {
-        "min_regret": min_regret,
-        "max_regret": max_regret,
-        "std_regret": std_regret,
+        # "min_regret": min_regret,
+        # "max_regret": max_regret,
+        # "std_regret": std_regret,
         "mean_regret": mean_regret,
         "all_regrets": all_regrets,
-        "final_regrets": final_regrets,
-        "quantiles": quantiles,
-        "means": means,
-        "std": std,
+        # "final_regrets": final_regrets,
+        # "quantiles": quantiles,
+        # "means": means,
+        # "std": std,
     }
     if models[0].store_IDS:
         IDS_res = [m.IDS_results for m in models]

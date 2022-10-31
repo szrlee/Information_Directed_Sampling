@@ -41,6 +41,8 @@ os.makedirs(path, exist_ok=True)
 
 param = {
     "TS": {},
+    "IS:Sphere": {"M": 10, "haar": False},
+    "IS:Haar": {"M": 10, "haar": True},
     "BayesUCB": {"p1": 0.01, "p2": 0.1, "c": 0},
     "IDS_approx": {"N": 1000, "display_results": False},
     "KG": {},
@@ -51,12 +53,14 @@ param = {
 
 methods = [
     "TS",
-    "BayesUCB",
-    "IDS_approx",
-    "KG",
-    "Approx_KG_star",
-    "IDS_sample",
-    "VIDS_sample",
+    "IS:Sphere",
+    "IS:Haar",
+    # "BayesUCB",
+    # "IDS_approx",
+    # "KG",
+    # "Approx_KG_star",
+    # "IDS_sample",
+    # "VIDS_sample",
 ]
 
 with open(os.path.join(path, "config.json"), "wt") as f:

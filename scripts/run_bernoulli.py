@@ -26,6 +26,7 @@ def get_args():
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
     parser.add_argument("--n-arms", type=int, default=10)
+    parser.add_argument("--d-index", type=int, default=10)
     parser.add_argument("--logdir", type=str, default="./results/bandit")
     args = parser.parse_known_args()[0]
     return args
@@ -41,8 +42,8 @@ os.makedirs(path, exist_ok=True)
 
 param = {
     "TS": {},
-    "IS:Sphere": {"M": 10, "haar": False},
-    "IS:Haar": {"M": 10, "haar": True},
+    "IS:Sphere": {"M": args.d_index, "haar": False},
+    "IS:Haar": {"M": args.d_index, "haar": True},
     "BayesUCB": {"p1": 0.01, "p2": 0.1, "c": 0},
     "IDS_approx": {"N": 1000, "display_results": False},
     "KG": {},

@@ -22,7 +22,7 @@ from datetime import datetime
 def get_args():
     parser = argparse.ArgumentParser()
     # environment config
-    parser.add_argument("--game", type=str, default="Gussian")
+    parser.add_argument("--game", type=str, default="Gaussian")
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
     parser.add_argument("--n-arms", type=int, default=10)
@@ -97,6 +97,7 @@ expe_params = {
     "labels": labels,
     "colors": colors,
     "path": path,
+    "problem": game,
 }
 lin = exp.gaussian_expe(**expe_params)
 

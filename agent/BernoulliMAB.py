@@ -1,5 +1,11 @@
 """ Packages import """
-from MAB import *
+from agent.MAB import *
+from utils import (
+    rd_argmax,
+    haar_matrix,
+    sphere_matrix,
+    multi_haar_matrix,
+)
 import utils
 from scipy.stats import beta
 from copy import copy
@@ -10,13 +16,13 @@ class BetaBernoulliMAB(GenericMAB):
     Bernoulli Bandit Problem
     """
 
-    def __init__(self, p):
+    def __init__(self, env, p):
         """
         Initialization
         :param p: np.array, true probabilities of success for each arm
         """
         # Initialization of arms from GenericMAB
-        super().__init__(methods=["B"] * len(p), p=p)
+        super().__init__(envs=[env] * len(p), p=p)
         # Complexity
         self.Cp = sum(
             [
@@ -71,38 +77,22 @@ class BetaBernoulliMAB(GenericMAB):
 
         return reward, expected_regret
 
-    def haar_matrix(self, M):
-        """
-        Haar random matrix generation
-        """
-        z = np.random.randn(M, M).astype(np.float32)
-        q, r = np.linalg.qr(z)
-        d = np.diag(r)
-        ph = d / np.abs(d)
-        return np.multiply(q, ph)
-
     def rand_vec_gen(self, M, N=1, haar=False):
         """
         Random vector generation
-        return N x M matrix
         """
         assert N > 0
         if not haar:
-            v = np.random.randn(N, M).astype(np.float32)
-            v /= np.linalg.norm(v, axis=1, keepdims=True)
-            return v
+            return sphere_matrix(N, M)
         # generate vectors from Haar random matrix
         if N == 1:
             if self.counter == 0:
-                self.V = self.haar_matrix(M)
+                self.V = haar_matrix(M)
             v = self.V[:, self.counter]
             self.counter = (self.counter + 1) % M
             return v
         else:
-            v = np.zeros(((N // M + 1) * M, M))
-            for _ in range(N // M + 1):
-                v[np.arange(M), :] = self.haar_matrix(M)
-            return v[np.arange(N), :]
+            return multi_haar_matrix(N, M)
 
     def update_xi_list(self, arm, Sxia, M, haar):
         Sxia[[arm]] += self.rand_vec_gen(M, haar=haar)
@@ -113,11 +103,11 @@ class BetaBernoulliMAB(GenericMAB):
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        mu_0 = (1 / 2) * np.ones(self.nb_arms) # (1/(a+b))
+        mu_0 = (1 / 2) * np.ones(self.nb_arms)  # (1/(a+b))
         b_0 = self.rand_vec_gen(M, N=self.nb_arms, haar=haar)  # shape N x M
-        sigma = 1 / 4 # p(1-p) <= 1/4
-        sigma_0 = 1 / 12 # (ab/(a+b+1)(a+b)**2)
-        beta = sigma ** 2 / sigma_0 ** 2
+        sigma = 1 / 4  # p(1-p) <= 1/4
+        sigma_0 = 1 / 12  # (ab/(a+b+1)(a+b)**2)
+        beta = sigma**2 / sigma_0**2
         Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         Sxia = np.zeros((self.nb_arms, M))
 
@@ -307,7 +297,7 @@ class BetaBernoulliMAB(GenericMAB):
             # Posterior update
             beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1 - reward[t]
             if display_results:
-                utils.display_results(delta, g, delta ** 2 / g, p_star)
+                utils.display_results(delta, g, delta**2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
 
         return reward, expected_regret
@@ -416,7 +406,7 @@ class BetaBernoulliMAB(GenericMAB):
                         for a in range(self.nb_arms)
                     ]
                 )
-                arm = rd_argmax(-(delta ** 2) / v)
+                arm = rd_argmax(-(delta**2) / v)
             else:
                 g = np.array(
                     [

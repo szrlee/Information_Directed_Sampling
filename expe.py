@@ -1,9 +1,9 @@
 """ Packages import """
-from MAB import GenericMAB
-from BernoulliMAB import BetaBernoulliMAB
-from GaussianMAB import GaussianMAB
-from FiniteSetsMAB import FiniteSets
+from agent.BernoulliMAB import BetaBernoulliMAB
+from agent.GaussianMAB import GaussianMAB
+from agent.FiniteSetsMAB import FiniteSets
 from agent.closedform import LinMAB
+from agent.MAB import GenericMAB
 from env.linear import (
     FGTSLinModel,
     PaperLinModel,
@@ -41,6 +41,7 @@ def bernoulli_expe(
     labels,
     colors,
     path,
+    problem="Bernoulli",
     doplot=True,
     frequentist=False,
     track_ids=False,
@@ -60,10 +61,10 @@ def bernoulli_expe(
     """
     if frequentist is False:
         P = np.random.uniform(0, 1, size=n_arms * n_expe).reshape(n_expe, n_arms)
-        models = [BetaBernoulliMAB(p) for p in P]
+        models = [BetaBernoulliMAB(problem, p=p) for p in P]
     else:
         p = frequentist
-        models = [BetaBernoulliMAB(p)] * n_expe
+        models = [BetaBernoulliMAB(problem, p=p)] * n_expe
     if track_ids:
         for m in models:
             m.store_IDS = True
@@ -84,6 +85,7 @@ def gaussian_expe(
     labels,
     colors,
     path,
+    problem="Gaussian",
     doplot=True,
     track_ids=False,
 ):
@@ -103,7 +105,7 @@ def gaussian_expe(
     mu = np.random.normal(0, 1, size=n_expe * n_arms).reshape(n_expe, n_arms)
     sigma = np.ones(n_arms * n_expe).reshape(n_expe, n_arms)
     P = [[[m[i], s[i]] for i in range(n_arms)] for m, s in zip(mu, sigma)]
-    models = [GaussianMAB(p) for p in P]
+    models = [GaussianMAB(problem, p=p) for p in P]
     if track_ids:
         for m in models:
             m.store_IDS = True
@@ -300,6 +302,7 @@ def FiniteContextHyperMAB_expe(
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
     from agent.hyper import HyperMAB
+
     if problem == "Zhang":
         models = [
             HyperMAB(FiniteContextFGTSLinModel(n_context, n_features, n_arms))
@@ -415,7 +418,9 @@ def InfiniteContextHyperMAB_expe(
     return results
 
 
-def finite_expe(methods, labels, colors, param_dic, prior, q, R, theta, N, T):
+def finite_expe(
+    methods, labels, colors, param_dic, prior, q, R, theta, N, T, problem="Finite"
+):
     """
     Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
     experiments. Here we deal with Finite Set Problems
@@ -432,7 +437,7 @@ def finite_expe(methods, labels, colors, param_dic, prior, q, R, theta, N, T):
     """
     nb_arms, nb_rewards = q.shape[1:3]
     p2 = [[R, q[theta, i, :]] for i in range(q.shape[1])]
-    check_MAB = GenericMAB(["F"] * nb_arms, p2)
+    check_MAB = GenericMAB([problem] * nb_arms, p2)
     plt.figure(1)
     for i, m in enumerate(methods):
         c = cmap[i] if not colors else colors[i]
@@ -449,7 +454,7 @@ def finite_expe(methods, labels, colors, param_dic, prior, q, R, theta, N, T):
     plt.show()
 
 
-def Finite_Bernoulli(n_expe, nb_arms, T, M, colors, doplot=False):
+def Finite_Bernoulli(n_expe, nb_arms, T, M, colors, problem="Finite", doplot=False):
     """
     Run Finite Sets on IDS on Bernoulli Bandits using M samples of nb_arms dimensional
     uniformly sampled parameters.
@@ -472,7 +477,7 @@ def Finite_Bernoulli(n_expe, nb_arms, T, M, colors, doplot=False):
     prior, q, R = build_bernoulli_finite_set(M, nb_arms)
     all_regrets = np.empty((n_expe, T))
     for i in tqdm(range(n_expe)):
-        my_MAB = FiniteSets(["F"] * nb_arms, true_param[i], q, prior, R)
+        my_MAB = FiniteSets([problem] * nb_arms, true_param[i], q, prior, R)
         all_regrets[i] = my_MAB.regret(my_MAB.IDS(T)[0], T)
     mean_regret = all_regrets.mean(axis=0).reshape((1, T))
     quantiles = {"Finite IDS": np.quantile(mean_regret, np.arange(0, 1, 21))}

@@ -1,16 +1,15 @@
 """ Packages import """
 import numpy as np
-import arms
-from tqdm import tqdm
+from env import arms
 from utils import rd_argmax
-import random
+from tqdm import tqdm
 import inspect
 
 mapping = {
-    "B": arms.ArmBernoulli,
-    "beta": arms.ArmBeta,
-    "F": arms.ArmFinite,
-    "G": arms.ArmGaussian,
+    "Bernoulli": arms.ArmBernoulli,
+    "Beta": arms.ArmBeta,
+    "Finite": arms.ArmFinite,
+    "Gaussian": arms.ArmGaussian,
 }
 
 
@@ -19,13 +18,13 @@ class GenericMAB:
     Generic class for arms that defines general methods
     """
 
-    def __init__(self, methods, p):
+    def __init__(self, envs, p):
         """
         Initialization of the arms
-        :param methods: string, probability distribution of each arm
+        :param envs: string, probability distribution of each arm
         :param p: np.array or list, parameters of the probability distribution of each arm
         """
-        self.MAB = self.generate_arms(methods, p)
+        self.MAB = self.generate_arms(envs, p)
         self.nb_arms = len(self.MAB)
         self.means = [el.mean for el in self.MAB]
         self.mu_max = np.max(self.means)
@@ -33,19 +32,19 @@ class GenericMAB:
         self.store_IDS = False
 
     @staticmethod
-    def generate_arms(methods, p):
+    def generate_arms(envs, p):
         """
         Method for generating different arms
-        :param methods: string, probability distribution of each arm
+        :param envs: string, probability distribution of each arm
         :param p: np.array or list, parameters of the probability distribution of each arm
         :return: list of class objects, list of arms
         """
         arms_list = list()
-        for i, m in enumerate(methods):
+        for i, e in enumerate(envs):
             args = [p[i]] + [[np.random.randint(1, 312414)]]
             args = sum(args, []) if type(p[i]) == list else args
             try:
-                alg = mapping[m]
+                alg = mapping[e]
                 arms_list.append(alg(*args))
             except Exception:
                 raise NotImplementedError
@@ -118,99 +117,6 @@ class GenericMAB:
         reward[t], Sa[arm] = new_reward, Sa[arm] + new_reward
         expected_regret[t] = self.mu_max - new_reward
 
-    def RandomPolicy(self, T):
-        """
-        Implementation of a random policy consisting in randomly choosing one of the available arms. Only useful
-        for checking that the behavior of the different policies is normal
-        :param T:  int, time horizon
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
-        for t in range(T):
-            arm = random.randint(0, self.nb_arms - 1)
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-
-        return reward, expected_regret
-
-    def ExploreCommit(self, T, m):
-        """
-        Implementation of Explore-then-Commit algorithm
-        :param T: int, time horizon
-        :param m: int, number of rounds before choosing the best action
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
-        for t in range(m * self.nb_arms):
-            arm = t % self.nb_arms
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-        arm = np.argmax(Sa / Na)
-        for t in range(m * self.nb_arms + 1, T):
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-
-        return reward, expected_regret
-
-    def UCB1(self, T, rho):
-        """
-        Implementation of UCB1 algorithm
-        :param T: int, time horizon
-        :param rho: float, parameter for balancing between exploration and exploitation
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
-        for t in range(T):
-            if t < self.nb_arms:
-                arm = t
-            else:
-                arm = rd_argmax(Sa / Na + rho * np.sqrt(np.log(t + 1) / 2 / Na))
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-
-        return reward, expected_regret
-
-    def UCB_Tuned(self, T):
-        """
-        Implementation of UCB-tuned algorithm
-        :param T: int, time horizon
-        :param rho: float, parameter for balancing between exploration and exploitation
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
-        S, m = np.zeros(self.nb_arms), np.zeros(self.nb_arms)
-        for t in range(T):
-            if t < self.nb_arms:
-                arm = t
-            else:
-                for arm in range(self.nb_arms):
-                    S[arm] = (
-                        sum([r ** 2 for r in reward[np.where(arm_sequence == arm)]])
-                        / Na[arm]
-                        - (Sa[arm] / Na[arm]) ** 2
-                    )
-                    m[arm] = min(0.25, S[arm] + np.sqrt(2 * np.log(t + 1) / Na[arm]))
-                arm = rd_argmax(Sa / Na + np.sqrt(np.log(t + 1) / Na * m))
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-
-        return reward, expected_regret
-
-    def MOSS(self, T, rho):
-        """
-        Implementation of Minimax Optimal Strategy in the Stochastic case (MOSS).
-        :param T: int, time horizon
-        :param rho: float, parameter for balancing between exploration and exploitation
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
-        for t in range(T):
-            if t < self.nb_arms:
-                arm = t
-            else:
-                root_term = np.array(
-                    list(map(lambda x: max(x, 1), T / (self.nb_arms * Na)))
-                )
-                arm = rd_argmax(Sa / Na + rho * np.sqrt(4 / Na * np.log(root_term)))
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-
-        return reward, expected_regret
-
     def IDSAction(self, delta, g):
         """
         Implementation of IDSAction algorithm as defined in Russo & Van Roy, p. 242
@@ -245,6 +151,6 @@ class GenericMAB:
             self.IDS_results["delta"].append(delta)
             self.IDS_results["g"].append(g)
             self.IDS_results["IR"].append(
-                np.inner(delta ** 2, policy) / np.inner(g, policy)
+                np.inner(delta**2, policy) / np.inner(g, policy)
             )
         return arm

@@ -1,7 +1,7 @@
 import numpy as np
 
 from utils import rd_argmax
-from hypermodel import HyperModel
+from agent.hypermodel import HyperModel
 
 
 class HyperMAB:

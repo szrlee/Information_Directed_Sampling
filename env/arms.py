@@ -69,7 +69,7 @@ class ArmGaussian(AbstractArm):
         self.mu = mu
         self.eta = eta
         super(ArmGaussian, self).__init__(
-            mean=mu, variance=eta ** 2, random_state=random_state
+            mean=mu, variance=eta**2, random_state=random_state
         )
 
     def sample(self):
@@ -92,7 +92,7 @@ class ArmFinite(AbstractArm):
         mean = np.sum(X * P)
         super(ArmFinite, self).__init__(
             mean=mean,
-            variance=np.sum(X ** 2 * P) - mean ** 2,
+            variance=np.sum(X**2 * P) - mean**2,
             random_state=random_state,
         )
 

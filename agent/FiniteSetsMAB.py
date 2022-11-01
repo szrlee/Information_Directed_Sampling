@@ -1,5 +1,6 @@
 """ Packages import """
-from MAB import *
+from agent.MAB import *
+from utils import rd_argmax
 
 
 class FiniteSets(GenericMAB):

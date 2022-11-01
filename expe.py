@@ -1,9 +1,9 @@
 """ Packages import """
-from MAB import GenericMAB
-from BernoulliMAB import BetaBernoulliMAB
-from GaussianMAB import GaussianMAB
-from FiniteSetsMAB import FiniteSets
+from agent.BernoulliMAB import BetaBernoulliMAB
+from agent.GaussianMAB import GaussianMAB
+from agent.FiniteSetsMAB import FiniteSets
 from agent.closedform import LinMAB
+from agent.MAB import GenericMAB
 from env.linear import (
     FGTSLinModel,
     PaperLinModel,
@@ -300,6 +300,7 @@ def FiniteContextHyperMAB_expe(
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
     from agent.hyper import HyperMAB
+
     if problem == "Zhang":
         models = [
             HyperMAB(FiniteContextFGTSLinModel(n_context, n_features, n_arms))

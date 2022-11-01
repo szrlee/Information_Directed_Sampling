@@ -6,10 +6,10 @@ from tqdm import tqdm
 import inspect
 
 mapping = {
-    "B": arms.ArmBernoulli,
-    "beta": arms.ArmBeta,
-    "F": arms.ArmFinite,
-    "G": arms.ArmGaussian,
+    "Bernoulli": arms.ArmBernoulli,
+    "Beta": arms.ArmBeta,
+    "Finite": arms.ArmFinite,
+    "Gussian": arms.ArmGaussian,
 }
 
 

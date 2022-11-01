@@ -97,6 +97,7 @@ expe_params = {
     "labels": labels,
     "colors": colors,
     "path": path,
+    "problem": game,
 }
 lin = exp.gaussian_expe(**expe_params)
 

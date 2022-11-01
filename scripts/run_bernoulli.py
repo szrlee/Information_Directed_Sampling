@@ -53,15 +53,15 @@ param = {
 }
 
 methods = [
-    # "TS",
-    # "IS:Sphere",
+    "TS",
+    "IS:Sphere",
     "IS:Haar",
-    # "BayesUCB",
-    # "IDS_approx",
-    # "KG",
-    # "Approx_KG_star",
-    # "IDS_sample",
-    # "VIDS_sample",
+    "BayesUCB",
+    "IDS_approx",
+    "KG",
+    "Approx_KG_star",
+    "IDS_sample",
+    "VIDS_sample",
 ]
 
 with open(os.path.join(path, "config.json"), "wt") as f:
@@ -100,6 +100,7 @@ expe_params = {
     "labels": labels,
     "colors": colors,
     "path": path,
+    "problem": game,
 }
 lin = exp.bernoulli_expe(**expe_params)
 

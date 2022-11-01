@@ -41,7 +41,7 @@ def bernoulli_expe(
     labels,
     colors,
     path,
-    problem="B",
+    problem="Bernoulli",
     doplot=True,
     frequentist=False,
     track_ids=False,
@@ -85,7 +85,7 @@ def gaussian_expe(
     labels,
     colors,
     path,
-    problem="G",
+    problem="Gussian",
     doplot=True,
     track_ids=False,
 ):
@@ -418,7 +418,9 @@ def InfiniteContextHyperMAB_expe(
     return results
 
 
-def finite_expe(methods, labels, colors, param_dic, prior, q, R, theta, N, T):
+def finite_expe(
+    methods, labels, colors, param_dic, prior, q, R, theta, N, T, problem="Finite"
+):
     """
     Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
     experiments. Here we deal with Finite Set Problems
@@ -435,7 +437,7 @@ def finite_expe(methods, labels, colors, param_dic, prior, q, R, theta, N, T):
     """
     nb_arms, nb_rewards = q.shape[1:3]
     p2 = [[R, q[theta, i, :]] for i in range(q.shape[1])]
-    check_MAB = GenericMAB(["F"] * nb_arms, p2)
+    check_MAB = GenericMAB([problem] * nb_arms, p2)
     plt.figure(1)
     for i, m in enumerate(methods):
         c = cmap[i] if not colors else colors[i]
@@ -452,7 +454,7 @@ def finite_expe(methods, labels, colors, param_dic, prior, q, R, theta, N, T):
     plt.show()
 
 
-def Finite_Bernoulli(n_expe, nb_arms, T, M, colors, doplot=False):
+def Finite_Bernoulli(n_expe, nb_arms, T, M, colors, problem="Finite", doplot=False):
     """
     Run Finite Sets on IDS on Bernoulli Bandits using M samples of nb_arms dimensional
     uniformly sampled parameters.
@@ -475,7 +477,7 @@ def Finite_Bernoulli(n_expe, nb_arms, T, M, colors, doplot=False):
     prior, q, R = build_bernoulli_finite_set(M, nb_arms)
     all_regrets = np.empty((n_expe, T))
     for i in tqdm(range(n_expe)):
-        my_MAB = FiniteSets(["F"] * nb_arms, true_param[i], q, prior, R)
+        my_MAB = FiniteSets([problem] * nb_arms, true_param[i], q, prior, R)
         all_regrets[i] = my_MAB.regret(my_MAB.IDS(T)[0], T)
     mean_regret = all_regrets.mean(axis=0).reshape((1, T))
     quantiles = {"Finite IDS": np.quantile(mean_regret, np.arange(0, 1, 21))}

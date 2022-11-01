@@ -1,10 +1,11 @@
 """ Packages import """
 import numpy as np
-from utils import rd_argmax
+from utils import rd_argmax, haar_matrix, sphere_matrix, multi_haar_matrix
 from scipy.stats import norm
 from scipy.linalg import sqrtm
 
 # from scipy.stats import multivariate_normal
+
 
 class LinMAB:
     def __init__(self, model):
@@ -122,21 +123,11 @@ class LinMAB:
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             # Update M models with algorithmic random perturbation
             P_t += np.outer(
-                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta ** 2
+                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta**2
             )
             A_t = Sigma_t @ P_t
 
         return reward, expected_regret
-
-    def haar_matrix(self, M):
-        """
-        Haar random matrix generation
-        """
-        z = np.random.randn(M, M).astype(np.float32)
-        q, r = np.linalg.qr(z)
-        d = np.diag(r)
-        ph = d / np.abs(d)
-        return np.multiply(q, ph)
 
     def rand_vec_gen(self, M, N=1, haar=False):
         """
@@ -144,21 +135,16 @@ class LinMAB:
         """
         assert N > 0
         if not haar:
-            v = np.random.randn(N, M).astype(np.float32)
-            v /= np.linalg.norm(v, axis=1, keepdims=True)
-            return v
+            return sphere_matrix(N, M)
         # generate vectors from Haar random matrix
         if N == 1:
             if self.counter == 0:
-                self.V = self.haar_matrix(M)
+                self.V = haar_matrix(M)
             v = self.V[:, self.counter]
             self.counter = (self.counter + 1) % M
             return v
         else:
-            v = np.zeros(((N // M + 1) * M, M))
-            for _ in range(N // M + 1):
-                v[np.arange(M), :] = self.haar_matrix(M)
-            return v[np.arange(N), :]
+            return multi_haar_matrix(N, M)
 
     def IS(self, T, M=10, haar=False):
         """

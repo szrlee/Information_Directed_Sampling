@@ -22,7 +22,12 @@ from datetime import datetime
 def get_args():
     parser = argparse.ArgumentParser()
     # environment config
-    parser.add_argument("--game", type=str, default="Russo",choices=["Russo", "FreqRusso", "Zhang", "movieLens"])
+    parser.add_argument(
+        "--game",
+        type=str,
+        default="Russo",
+        choices=["Russo", "FreqRusso", "Zhang", "movieLens"],
+    )
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
     parser.add_argument("--d-index", type=int, default=10)

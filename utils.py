@@ -113,6 +113,30 @@ def rd_argmax(vector):
     return rd.choice(indices)
 
 
+def haar_matrix(M):
+    """
+    Haar random matrix generation
+    """
+    z = np.random.randn(M, M).astype(np.float32)
+    q, r = np.linalg.qr(z)
+    d = np.diag(r)
+    ph = d / np.abs(d)
+    return np.multiply(q, ph)
+
+
+def sphere_matrix(N, M):
+    v = np.random.randn(N, M).astype(np.float32)
+    v /= np.linalg.norm(v, axis=1, keepdims=True)
+    return v
+
+
+def multi_haar_matrix(N, M):
+    v = np.zeros(((N // M + 1) * M, M))
+    for _ in range(N // M + 1):
+        v[np.arange(M), :] = haar_matrix(M)
+    return v[np.arange(N), :]
+
+
 def display_results(delta, g, ratio, p_star):
     """
     Display quantities of interest in IDS algorithm

@@ -9,7 +9,7 @@ mapping = {
     "Bernoulli": arms.ArmBernoulli,
     "Beta": arms.ArmBeta,
     "Finite": arms.ArmFinite,
-    "Gussian": arms.ArmGaussian,
+    "Gaussian": arms.ArmGaussian,
 }
 
 

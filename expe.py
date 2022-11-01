@@ -85,7 +85,7 @@ def gaussian_expe(
     labels,
     colors,
     path,
-    problem="Gussian",
+    problem="Gaussian",
     doplot=True,
     track_ids=False,
 ):

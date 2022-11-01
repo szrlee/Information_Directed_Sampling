@@ -5,22 +5,22 @@ from agent.hypermodel import HyperModel
 
 
 class HyperMAB:
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, env):
+        self.env = env
         self.expect_regret, self.n_a, self.d, self.features = (
-            model.expect_regret,
-            model.n_actions,
-            model.n_features,
-            model.features,
+            env.expect_regret,
+            env.n_actions,
+            env.n_features,
+            env.features,
         )
-        self.reward, self.eta = model.reward, model.eta
-        self.prior_sigma = model.alg_prior_sigma
+        self.reward, self.eta = env.reward, env.eta
+        self.prior_sigma = env.alg_prior_sigma
         self.threshold = 0.999
         self.store_IDS = False
 
     def set_context(self):
-        self.model.set_context()
-        self.features = self.model.features
+        self.env.set_context()
+        self.features = self.env.features
 
     def initPrior(self):
         a0 = 0

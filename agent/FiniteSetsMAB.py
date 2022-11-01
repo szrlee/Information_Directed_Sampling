@@ -4,17 +4,17 @@ from utils import rd_argmax
 
 
 class FiniteSets(GenericMAB):
-    def __init__(self, method, param, q_theta, prior, R):
+    def __init__(self, envs, param, q_theta, prior, R):
         """
         Initialization of Finite Set Bandit Problems : theta in [1,L], Y in [1,N], A in [1,K]
         K is the number of arms in our algorithm and is denoted nb_arms
-        :param method: list, distributions of each arm
+        :param env: list, distributions of each arm
         :param param: list, parameters of each arm's distribution
         :param q_theta: np.array, L*K*N array with the probability of each outcome knowing theta
         :param prior: np.array,
         :param R: np.array, mapping between outcomes and rewards
         """
-        super().__init__(method, param)
+        super().__init__(envs, param)
         self.means = [(R * p[1]).sum() for p in param]
         self.mu_max = max(self.means)
         self.q_theta = q_theta

@@ -10,8 +10,8 @@ class oldMAB(GenericMAB):
     Old MAB class for arms that defines general methods
     """
 
-    def __init__(self, methods, p):
-        super().__init__(methods=methods, p=p)
+    def __init__(self, env, p):
+        super().__init__(envs=[env] * len(p), p=p)
 
     def RandomPolicy(self, T):
         """
@@ -105,41 +105,3 @@ class oldMAB(GenericMAB):
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
 
         return reward, expected_regret
-
-    def IDSAction(self, delta, g):
-        """
-        Implementation of IDSAction algorithm as defined in Russo & Van Roy, p. 242
-        :param delta: np.array, instantaneous regrets
-        :param g: np.array, information gains
-        :return: int, arm to pull
-        """
-        Q = np.zeros((self.nb_arms, self.nb_arms))
-        IR = np.ones((self.nb_arms, self.nb_arms)) * np.inf
-        q = np.linspace(0, 1, 1000)
-        for a in range(self.nb_arms - 1):
-            for ap in range(a + 1, self.nb_arms):
-                if g[a] < 1e-6 or g[ap] < 1e-6:
-                    return rd_argmax(-g)
-                da, dap, ga, gap = delta[a], delta[ap], g[a], g[ap]
-                qaap = q[
-                    rd_argmax(
-                        -((q * da + (1 - q) * dap) ** 2) / (q * ga + (1 - q) * gap)
-                    )
-                ]
-                IR[a, ap] = (qaap * (da - dap) + dap) ** 2 / (qaap * (ga - gap) + gap)
-                Q[a, ap] = qaap
-        amin = rd_argmax(-IR.reshape(self.nb_arms * self.nb_arms))
-        a, ap = amin // self.nb_arms, amin % self.nb_arms
-        b = np.random.binomial(1, Q[a, ap])
-        arm = int(b * a + (1 - b) * ap)
-        if self.store_IDS:
-            self.IDS_results["arms"].append(arm)
-            policy = np.zeros(self.nb_arms)
-            policy[a], policy[ap] = Q[a, ap], (1 - Q[a, ap])
-            self.IDS_results["policy"].append(policy)
-            self.IDS_results["delta"].append(delta)
-            self.IDS_results["g"].append(g)
-            self.IDS_results["IR"].append(
-                np.inner(delta**2, policy) / np.inner(g, policy)
-            )
-        return arm

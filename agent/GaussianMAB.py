@@ -9,13 +9,13 @@ class GaussianMAB(GenericMAB):
     Gaussian Bandit Problem
     """
 
-    def __init__(self, p):
+    def __init__(self, env, p):
         """
         Initialization
         :param p: np.array, true values of (mu, sigma) for each arm with mean sampled from N(mu, sigma)
         """
         # Initialization of arms from GenericMAB
-        super().__init__(methods=["G"] * len(p), p=p)
+        super().__init__(envs=[env] * len(p), p=p)
         # Parameters used for stop learning policy
         self.flag = False
         self.optimal_arm = None

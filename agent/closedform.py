@@ -8,19 +8,19 @@ from scipy.linalg import sqrtm
 
 
 class LinMAB:
-    def __init__(self, model):
+    def __init__(self, env):
         """
-        :param model: ArmGaussianLinear object
+        :param env: ArmGaussianLinear object
         """
-        self.model = model
+        self.env = env
         self.expect_regret, self.n_a, self.d, self.features = (
-            model.expect_regret,
-            model.n_actions,
-            model.n_features,
-            model.features,
+            env.expect_regret,
+            env.n_actions,
+            env.n_features,
+            env.features,
         )
-        self.reward, self.eta = model.reward, model.eta
-        self.prior_sigma = model.alg_prior_sigma
+        self.reward, self.eta = env.reward, env.eta
+        self.prior_sigma = env.alg_prior_sigma
         # self.flag = False
         # self.optimal_arm = None
         self.threshold = 0.999

@@ -16,13 +16,13 @@ class BetaBernoulliMAB(GenericMAB):
     Bernoulli Bandit Problem
     """
 
-    def __init__(self, p):
+    def __init__(self, env, p):
         """
         Initialization
         :param p: np.array, true probabilities of success for each arm
         """
         # Initialization of arms from GenericMAB
-        super().__init__(methods=["B"] * len(p), p=p)
+        super().__init__(envs=[env] * len(p), p=p)
         # Complexity
         self.Cp = sum(
             [

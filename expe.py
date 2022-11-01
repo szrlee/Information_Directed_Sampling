@@ -41,6 +41,7 @@ def bernoulli_expe(
     labels,
     colors,
     path,
+    problem="B",
     doplot=True,
     frequentist=False,
     track_ids=False,
@@ -60,10 +61,10 @@ def bernoulli_expe(
     """
     if frequentist is False:
         P = np.random.uniform(0, 1, size=n_arms * n_expe).reshape(n_expe, n_arms)
-        models = [BetaBernoulliMAB(p) for p in P]
+        models = [BetaBernoulliMAB(problem, p=p) for p in P]
     else:
         p = frequentist
-        models = [BetaBernoulliMAB(p)] * n_expe
+        models = [BetaBernoulliMAB(problem, p=p)] * n_expe
     if track_ids:
         for m in models:
             m.store_IDS = True
@@ -84,6 +85,7 @@ def gaussian_expe(
     labels,
     colors,
     path,
+    problem="G",
     doplot=True,
     track_ids=False,
 ):
@@ -103,7 +105,7 @@ def gaussian_expe(
     mu = np.random.normal(0, 1, size=n_expe * n_arms).reshape(n_expe, n_arms)
     sigma = np.ones(n_arms * n_expe).reshape(n_expe, n_arms)
     P = [[[m[i], s[i]] for i in range(n_arms)] for m, s in zip(mu, sigma)]
-    models = [GaussianMAB(p) for p in P]
+    models = [GaussianMAB(problem, p=p) for p in P]
     if track_ids:
         for m in models:
             m.store_IDS = True

@@ -29,6 +29,7 @@ class BetaBernoulliMAB(GenericMAB):
         self.flag = False
         self.optimal_arm = None
         self.threshold = 0.99
+        self.counter = 0
 
     @staticmethod
     def kl(x, y):
@@ -130,7 +131,6 @@ class BetaBernoulliMAB(GenericMAB):
                 for k in range(self.nb_arms):
                     mu[k] = (Sa[k] + beta * mu_0[k]) / (Na[k] + beta)
                     m[k] = (sigma * Sxia[k] + beta * sigma_0 * b_0[k]) / (Na[k] + beta)
-                    # theta[k] = np.random.beta(Sa[k] + 1, Na[k] - Sa[k] + 1) # TODO
                     z = np.random.normal(0, 1, M)
                     theta[k] = mu[k] + m[k] @ z
                 arm = rd_argmax(theta)

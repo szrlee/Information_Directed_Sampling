@@ -53,8 +53,8 @@ param = {
 }
 
 methods = [
-    "TS",
-    "IS:Sphere",
+    # "TS",
+    # "IS:Sphere",
     "IS:Haar",
     # "BayesUCB",
     # "IDS_approx",

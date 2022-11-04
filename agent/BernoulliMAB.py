@@ -84,9 +84,40 @@ class BetaBernoulliMAB(GenericMAB):
 
         return reward, expected_regret
 
+    def init_exp_list(self, alpha, beta, M=1):
+        Sexpa = np.random.exponential(1, (self.nb_arms, M, alpha)).sum(axis=2)
+        Sexpb = np.random.exponential(1, (self.nb_arms, M, beta)).sum(axis=2)
+        return Sexpa, Sexpb
+
+    def update_exp_list(self, arm, reward, Sexpa, Sexpb, M=1):
+        exp_noise = np.random.exponential(1, M)
+        Sexpa[arm] += exp_noise * reward
+        Sexpb[arm] += exp_noise * (1 - reward)
+
+    def ES(self, T, M):
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
+        Sexpa, Sexpb = self.init_exp_list(alpha=1, beta=1, M=M)
+        # theta = np.zeros(self.nb_arms, M)
+        for t in range(T):
+            if t < self.nb_arms:
+                arm = t
+            else:
+                theta = Sexpa / (Sexpa + Sexpb)
+                # Ensemble sampling
+                index = np.random.choice(M, 1)[0]
+                arm = rd_argmax(theta[:, index])
+            # update statistics
+            new_reward = self.update_lists(
+                t, arm, Sa, Na, reward, arm_sequence, expected_regret
+            )
+            self.update_exp_list(arm, new_reward, Sexpa, Sexpb, M)
+
+        return reward, expected_regret
+
     def rand_vec_gen(self, M, N=1, haar=False):
         """
         Random vector generation
+        mainly for index sampling
         """
         assert N > 0
         if not haar:
@@ -110,11 +141,11 @@ class BetaBernoulliMAB(GenericMAB):
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        mu_0 = (1 / 2) * np.ones(self.nb_arms)  # (1/(a+b))
+        mu_0 = (1 / 2) * np.ones(self.nb_arms)  # (a /(a+b))
         b_0 = self.rand_vec_gen(M, N=self.nb_arms, haar=haar)  # shape N x M
         sigma = 1 / 4  # p(1-p) <= 1/4
         sigma_0 = 1 / 12  # (ab/(a+b+1)(a+b)**2)
-        beta = sigma**2 / sigma_0**2
+        beta = sigma ** 2 / sigma_0 ** 2
         Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         Sxia = np.zeros((self.nb_arms, M))
 
@@ -128,6 +159,8 @@ class BetaBernoulliMAB(GenericMAB):
                 for k in range(self.nb_arms):
                     mu[k] = (Sa[k] + beta * mu_0[k]) / (Na[k] + beta)
                     m[k] = (sigma * Sxia[k] + beta * sigma_0 * b_0[k]) / (Na[k] + beta)
+                    # TODO: Need to move this IS implementation to GaussianMAB (z-dependent Gaussian)
+                    # TODO: Need to implement z-dependent Exponential noise here
                     z = np.random.normal(0, 1, M)
                     theta[k] = mu[k] + m[k] @ z
                 arm = rd_argmax(theta)
@@ -304,7 +337,7 @@ class BetaBernoulliMAB(GenericMAB):
             # Posterior update
             beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1 - reward[t]
             if display_results:
-                utils.display_results(delta, g, delta**2 / g, p_star)
+                utils.display_results(delta, g, delta ** 2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
 
         return reward, expected_regret
@@ -413,7 +446,7 @@ class BetaBernoulliMAB(GenericMAB):
                         for a in range(self.nb_arms)
                     ]
                 )
-                arm = rd_argmax(-(delta**2) / v)
+                arm = rd_argmax(-(delta ** 2) / v)
             else:
                 g = np.array(
                     [

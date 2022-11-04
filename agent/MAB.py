@@ -118,6 +118,7 @@ class GenericMAB:
         Na[arm], arm_sequence[t], new_reward = Na[arm] + 1, arm, self.MAB[arm].sample()
         reward[t], Sa[arm] = new_reward, Sa[arm] + new_reward
         expected_regret[t] = self.mu_max - new_reward
+        return new_reward
 
     def IDSAction(self, delta, g):
         """
@@ -153,6 +154,6 @@ class GenericMAB:
             self.IDS_results["delta"].append(delta)
             self.IDS_results["g"].append(g)
             self.IDS_results["IR"].append(
-                np.inner(delta**2, policy) / np.inner(g, policy)
+                np.inner(delta ** 2, policy) / np.inner(g, policy)
             )
         return arm

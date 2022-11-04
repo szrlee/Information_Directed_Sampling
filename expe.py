@@ -43,7 +43,6 @@ def bernoulli_expe(
     path,
     problem="Bernoulli",
     doplot=True,
-    frequentist=False,
     track_ids=False,
 ):
     """
@@ -59,12 +58,8 @@ def bernoulli_expe(
     :param doplot: boolean, plot the curves or not
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
-    if frequentist is False:
-        P = np.random.uniform(0, 1, size=n_arms * n_expe).reshape(n_expe, n_arms)
-        models = [BetaBernoulliMAB(problem, p=p) for p in P]
-    else:
-        p = frequentist
-        models = [BetaBernoulliMAB(problem, p=p)] * n_expe
+
+    models = [BetaBernoulliMAB(problem, n_arms) for _ in range(n_expe)]
     if track_ids:
         for m in models:
             m.store_IDS = True
@@ -102,10 +97,8 @@ def gaussian_expe(
     :param doplot: boolean, plot the curves or not
     :return: dict, regrets, quantiles, means, stds of final regrets for each methods
     """
-    mu = np.random.normal(0, 1, size=n_expe * n_arms).reshape(n_expe, n_arms)
-    sigma = np.ones(n_arms * n_expe).reshape(n_expe, n_arms)
-    P = [[[m[i], s[i]] for i in range(n_arms)] for m, s in zip(mu, sigma)]
-    models = [GaussianMAB(problem, p=p) for p in P]
+
+    models = [GaussianMAB(problem, n_arms) for _ in range(n_expe)]
     if track_ids:
         for m in models:
             m.store_IDS = True

@@ -7,9 +7,11 @@ import inspect
 
 mapping = {
     "Bernoulli": arms.ArmBernoulli,
+    "FreqBernoulli": arms.ArmBernoulli,
     "Beta": arms.ArmBeta,
     "Finite": arms.ArmFinite,
     "Gaussian": arms.ArmGaussian,
+    "FreqGaussian": arms.ArmGaussian,
 }
 
 

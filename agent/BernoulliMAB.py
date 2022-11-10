@@ -21,15 +21,8 @@ class BetaBernoulliMAB(GenericMAB):
         Initialization
         :param n_actions: int number of arms
         """
-        # Initialization true probabilities of success for each arm
-        if env.startswith("Freq"):
-            self._rng = np.random.RandomState(2022)
-        else:
-            self._rng = np.random.RandomState(np.random.randint(1, 312414))
-        p = self._rng.uniform(0, 1, size=n_actions)
-
         # Initialization of arms from GenericMAB
-        super().__init__(envs=[env] * n_actions, p=p)
+        super().__init__(envs=[env] * n_actions, frequentist=env.startswith("Freq"))
         # Complexity
         self.Cp = sum(
             [
@@ -145,7 +138,7 @@ class BetaBernoulliMAB(GenericMAB):
         b_0 = self.rand_vec_gen(M, N=self.nb_arms, haar=haar)  # shape N x M
         sigma = 1 / 4  # p(1-p) <= 1/4
         sigma_0 = 1 / 12  # (ab/(a+b+1)(a+b)**2)
-        beta = sigma ** 2 / sigma_0 ** 2
+        beta = sigma**2 / sigma_0**2
         Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         Sxia = np.zeros((self.nb_arms, M))
 
@@ -337,7 +330,7 @@ class BetaBernoulliMAB(GenericMAB):
             # Posterior update
             beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1 - reward[t]
             if display_results:
-                utils.display_results(delta, g, delta ** 2 / g, p_star)
+                utils.display_results(delta, g, delta**2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
 
         return reward, expected_regret
@@ -446,7 +439,7 @@ class BetaBernoulliMAB(GenericMAB):
                         for a in range(self.nb_arms)
                     ]
                 )
-                arm = rd_argmax(-(delta ** 2) / v)
+                arm = rd_argmax(-(delta**2) / v)
             else:
                 g = np.array(
                     [

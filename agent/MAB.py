@@ -20,13 +20,14 @@ class GenericMAB:
     Generic class for arms that defines general methods
     """
 
-    def __init__(self, envs, p):
+    def __init__(self, envs, frequentist=False, p=None):
         """
         Initialization of the arms
         :param envs: string, probability distribution of each arm
         :param p: np.array or list, parameters of the probability distribution of each arm
+        :param frequentist: bool, frequentist env
         """
-        self.MAB = self.generate_arms(envs, p)
+        self.MAB = self.generate_arms(envs, frequentist, p)
         self.nb_arms = len(self.MAB)
         self.means = [el.mean for el in self.MAB]
         self.mu_max = np.max(self.means)
@@ -34,17 +35,20 @@ class GenericMAB:
         self.store_IDS = False
 
     @staticmethod
-    def generate_arms(envs, p):
+    def generate_arms(envs, frequentist, p):
         """
         Method for generating different arms
         :param envs: string, probability distribution of each arm
-        :param p: np.array or list, parameters of the probability distribution of each arm
+        :param frequentist: bool, frequentist env
         :return: list of class objects, list of arms
         """
         arms_list = list()
         for i, e in enumerate(envs):
-            args = [p[i]] + [[np.random.randint(1, 312414)]]
-            args = sum(args, []) if type(p[i]) == list else args
+            if p is None:
+                args = [frequentist, np.random.randint(1, 312414)]
+            else:
+                args = [p[i]] + [[np.random.randint(1, 312414)]]
+                args = sum(args, []) if type(p[i]) == list else args
             try:
                 alg = mapping[e]
                 arms_list.append(alg(*args))
@@ -154,6 +158,6 @@ class GenericMAB:
             self.IDS_results["delta"].append(delta)
             self.IDS_results["g"].append(g)
             self.IDS_results["IR"].append(
-                np.inner(delta ** 2, policy) / np.inner(g, policy)
+                np.inner(delta**2, policy) / np.inner(g, policy)
             )
         return arm

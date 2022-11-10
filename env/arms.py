@@ -18,11 +18,16 @@ class AbstractArm(object):
 
 
 class ArmBernoulli(AbstractArm):
-    def __init__(self, p, random_state=0):
+    def __init__(self, frequentist=True, random_state=0):
         """
-        :param p: float, mean parameter
+        :param frequentist: bool, frequentist env
         :param random_state: int, seed to make experiments reproducible
         """
+        if frequentist:
+            self._rng = np.random.RandomState(2022)
+        else:
+            self._rng = np.random.RandomState(np.random.randint(1, 312414))
+        p = self._rng.uniform(0, 1)
         self.p = p
         super(ArmBernoulli, self).__init__(
             mean=p, variance=p * (1.0 - p), random_state=random_state
@@ -60,12 +65,17 @@ class ArmBeta(AbstractArm):
 
 
 class ArmGaussian(AbstractArm):
-    def __init__(self, mu, eta, random_state=0):
+    def __init__(self, frequentist=True, random_state=0):
         """
-        :param mu: float, mean parameter in gaussian distribution
-        :param eta: float, std parameter in gaussian distribution
+        :param frequentist: bool, frequentist env
         :param random_state: int, seed to make experiments reproducible
         """
+        if frequentist:
+            self._rng = np.random.RandomState(2022)
+        else:
+            self._rng = np.random.RandomState(np.random.randint(1, 312414))
+        mu = self._rng.normal(0, 1)
+        eta = np.ones(1)
         self.mu = mu
         self.eta = eta
         super(ArmGaussian, self).__init__(

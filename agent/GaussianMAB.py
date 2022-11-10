@@ -14,17 +14,8 @@ class GaussianMAB(GenericMAB):
         Initialization
         :param n_actions: int number of arms
         """
-        # Initialization true probabilities of success for each arm
-        if env.startswith("Freq"):
-            self._rng = np.random.RandomState(2022)
-        else:
-            self._rng = np.random.RandomState(np.random.randint(1, 312414))
-        mu = self._rng.normal(0, 1, size=n_actions)
-        sigma = np.ones(n_actions)
-        p = [[mu[i], sigma[i]] for i in range(n_actions)]
-
         # Initialization of arms from GenericMAB
-        super().__init__(envs=[env] * n_actions, p=p)
+        super().__init__(envs=[env] * n_actions, frequentist=env.startswith("Freq"))
         # Parameters used for stop learning policy
         self.flag = False
         self.optimal_arm = None

@@ -26,7 +26,7 @@ def get_args():
         "--game",
         type=str,
         default="Bernoulli",
-        choices=["Bernoulli", "FreqBernoulli"],
+        choices=["Gaussian", "FreqGaussian", "Bernoulli", "FreqBernoulli"],
     )
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
@@ -48,8 +48,6 @@ os.makedirs(path, exist_ok=True)
 param = {
     "TS": {},
     "ES": {"M": args.d_index},
-    "IS:Sphere": {"M": args.d_index, "haar": False},
-    "IS:Haar": {"M": args.d_index, "haar": True},
     "BayesUCB": {"p1": 0.01, "p2": 0.1, "c": 0},
     "IDS_approx": {"N": 1000, "display_results": False},
     "KG": {},
@@ -61,8 +59,6 @@ param = {
 methods = [
     "TS",
     "ES",
-    # "IS:Sphere",
-    # "IS:Haar",
     # "BayesUCB",
     # "IDS_approx",
     # "KG",

@@ -1,6 +1,11 @@
 """ Packages import """
 from agent.MAB import *
-from utils import rd_argmax
+from utils import (
+    rd_argmax,
+    haar_matrix,
+    sphere_matrix,
+    multi_haar_matrix,
+)
 from scipy.stats import norm
 
 
@@ -16,23 +21,37 @@ class GaussianMAB(GenericMAB):
         """
         # Initialization of arms from GenericMAB
         super().__init__(envs=[env] * n_actions, frequentist=env.startswith("Freq"))
+        # Init parameters
+        if "Bernoulli" in env:
+            self.mu0 = 1 / 2  # (a /(a+b))
+            self.eta = 1 / 4  # p(1-p) <= 1/4
+            self.s0 = 1 / 12  # (ab/(a+b+1)(a+b)**2)
+        elif "Gaussian" in env:
+            self.mu0 = 0  # prior mean
+            self.eta = 1  # noise std
+            self.s0 = 1  # prior std
+        else:
+            raise NotImplemented
         # Parameters used for stop learning policy
         self.flag = False
         self.optimal_arm = None
         self.threshold = 0.99
 
+        # Parameters used for Haar matrix
+        self.counter = 0
+
     def init_prior(self, mu0=0, s0=1):
         """
         Init Gaussian prior
         :param mu0: float, multiplicative factor for mean
-        :param s0: float, multiplicative factor for variance
+        :param s0: float, multiplicative factor for variance (std)
         :return: np.arrays, prior values (mu, sigma) for each earm
         """
         mu = mu0 * np.ones(self.nb_arms)
         sigma = s0 * np.ones(self.nb_arms)
         return mu, sigma
 
-    def update_posterior(self, arm, r, sigma, mu):
+    def update_posterior(self, arm, r, sigma, mu, eta=1):
         """
         Update posterior mean and std for the chose arm only
         :param arm: int, arm chose
@@ -41,12 +60,98 @@ class GaussianMAB(GenericMAB):
         :param mu: np.array, posterior means
         :return: np.arrays, updated means and stds
         """
-        eta = self.MAB[arm].eta
-        mu[arm] = (eta**2 * mu[arm] + r * sigma[arm] ** 2) / (
-            eta**2 + sigma[arm] ** 2
+        # eta = self.MAB[arm].eta
+        mu[arm] = (eta ** 2 * mu[arm] + r * sigma[arm] ** 2) / (
+            eta ** 2 + sigma[arm] ** 2
         )
-        sigma[arm] = np.sqrt((eta * sigma[arm]) ** 2 / (eta**2 + sigma[arm] ** 2))
+        sigma[arm] = np.sqrt((eta * sigma[arm]) ** 2 / (eta ** 2 + sigma[arm] ** 2))
         return mu, sigma
+
+    def ES(self, T, M=10):
+        """
+        Implementation of Ensemble Sampling (TS) algorithm for Gaussian Bandit Problems with normal prior
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        mu0 = self.mu0
+        s0 = self.s0
+        eta = self.eta
+        beta = eta ** 2 / s0 ** 2
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
+        mu_0, sigma_0 = self.init_prior(mu0=mu0, s0=s0)
+        B = np.random.normal(0, 1, (self.nb_arms, M))
+        Sam = np.zeros((self.nb_arms, M))
+        # print(B.shape, np.linalg.norm(B, axis=1))
+        A0 = mu_0.reshape((self.nb_arms, 1)) + np.diag(sigma_0) @ B
+        for t in range(T):
+            if t < self.nb_arms:
+                arm = t
+            else:
+                theta = np.diag(1 / (Na + beta)) @ (Sam + beta * A0)
+                arm = rd_argmax(theta)
+            #
+            new_reward = self.update_lists(
+                t, arm, Sa, Na, reward, arm_sequence, expected_regret
+            )
+            Sam[arm] += new_reward + np.random.normal(0, eta, M)
+
+        return reward, expected_regret
+
+    def rand_vec_gen(self, M, N=1, haar=False):
+        """
+        Random vector generation
+        mainly for index sampling
+        """
+        assert N > 0
+        if not haar:
+            return sphere_matrix(N, M)
+        # generate vectors from Haar random matrix
+        if N == 1:
+            if self.counter == 0:
+                self.V = haar_matrix(M)
+            v = self.V[:, self.counter]
+            self.counter = (self.counter + 1) % M
+            return v
+        else:
+            return multi_haar_matrix(N, M)
+
+    def update_xi_list(self, arm, Sxia, M, haar):
+        Sxia[[arm]] += self.rand_vec_gen(M, haar=haar)
+
+    def IS(self, T, M, haar):
+        """
+        Implementation of Index Sampling (IS) algorithm for Bernoulli Bandit Problems with beta prior
+        :param T: int, time horizon
+        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
+        """
+        # Init parameters
+        mu0 = self.mu0
+        s0 = self.s0
+        eta = self.eta
+        # Init
+        mu_0 = mu0 * np.ones(self.nb_arms)
+        b_0 = self.rand_vec_gen(M, N=self.nb_arms, haar=haar)  # shape N x M
+        beta = eta ** 2 / s0 ** 2
+        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
+        Sxia = np.zeros((self.nb_arms, M))
+
+        theta = np.zeros(self.nb_arms)
+        mu = np.zeros(self.nb_arms)
+        m = np.zeros((self.nb_arms, M))
+        for t in range(T):
+            if t < self.nb_arms:
+                arm = t
+            else:
+                for k in range(self.nb_arms):
+                    mu[k] = (Sa[k] + beta * mu_0[k]) / (Na[k] + beta)
+                    m[k] = (eta * Sxia[k] + beta * s0 * b_0[k]) / (Na[k] + beta)
+                    z = np.random.normal(0, 1, M)
+                    theta[k] = mu[k] + m[k] @ z
+                arm = rd_argmax(theta)
+            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
+            self.update_xi_list(arm, Sxia, M, haar)
+
+        return reward, expected_regret
 
     def TS(self, T):
         """
@@ -54,8 +159,13 @@ class GaussianMAB(GenericMAB):
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
+        # Init parameters
+        mu0 = self.mu0
+        s0 = self.s0
+        eta = self.eta
+        # Init
         Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
-        mu, sigma = self.init_prior()
+        mu, sigma = self.init_prior(mu0=mu0, s0=s0)
         for t in range(T):
             if t < self.nb_arms:
                 arm = t
@@ -68,7 +178,7 @@ class GaussianMAB(GenericMAB):
                 )
                 arm = rd_argmax(theta)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            mu, sigma = self.update_posterior(arm, reward[t], sigma, mu)
+            mu, sigma = self.update_posterior(arm, reward[t], sigma, mu, eta=eta)
 
         return reward, expected_regret
 
@@ -151,8 +261,8 @@ class GaussianMAB(GenericMAB):
                     for arm in range(self.nb_arms)
                 ]
             )
-            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma**2 + eta**2))
-            s_t = np.sqrt(sigma**2 - sigma_next**2)
+            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma ** 2 + eta ** 2))
+            s_t = np.sqrt(sigma ** 2 - sigma_next ** 2)
             v = s_t * self.kgf(-np.absolute(delta_t / (s_t + 10e-9)))
             arm = rd_argmax(mu + (T - t) * v)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
@@ -181,8 +291,8 @@ class GaussianMAB(GenericMAB):
                 ]
             )
             r = (delta_t / sigma) ** 2
-            m_lower = eta / (4 * sigma**2) * (-1 + r + np.sqrt(1 + 6 * r + r**2))
-            m_higher = eta / (4 * sigma**2) * (1 + r + np.sqrt(1 + 10 * r + r**2))
+            m_lower = eta / (4 * sigma ** 2) * (-1 + r + np.sqrt(1 + 6 * r + r ** 2))
+            m_higher = eta / (4 * sigma ** 2) * (1 + r + np.sqrt(1 + 10 * r + r ** 2))
             m_star = np.zeros(self.nb_arms)
             for arm in range(self.nb_arms):
                 if T - t <= m_lower[arm]:
@@ -193,11 +303,11 @@ class GaussianMAB(GenericMAB):
                     m_star[arm] = np.ceil(0.5 * ((m_lower + m_higher)[arm])).astype(
                         int
                     )  # approximation
-            s_m = np.sqrt((m_star + 1) * sigma**2 / ((eta / sigma) ** 2 + m_star + 1))
+            s_m = np.sqrt((m_star + 1) * sigma ** 2 / ((eta / sigma) ** 2 + m_star + 1))
             v_m = s_m * self.kgf(-np.absolute(delta_t / (s_m + 10e-9)))
             arm = rd_argmax(mu - np.max(mu) + (T - t) * v_m)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma**2 + eta**2))
+            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma ** 2 + eta ** 2))
             mu[arm] = (eta[arm] ** 2 * mu[arm] + reward[t] * sigma[arm] ** 2) / (
                 eta[arm] ** 2 + sigma[arm] ** 2
             )

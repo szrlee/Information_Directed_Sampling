@@ -23,11 +23,15 @@ def get_args():
     parser = argparse.ArgumentParser()
     # environment config
     parser.add_argument(
-        "--game", type=str, default="Gaussian", choices=["Gaussian", "FreqGaussian"]
+        "--game",
+        type=str,
+        default="Bernoulli",
+        choices=["Gaussian", "FreqGaussian", "Bernoulli", "FreqBernoulli"],
     )
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
     parser.add_argument("--n-arms", type=int, default=10)
+    parser.add_argument("--d-index", type=int, default=10)
     parser.add_argument("--logdir", type=str, default="./results/bandit")
     args = parser.parse_known_args()[0]
     return args
@@ -43,6 +47,9 @@ os.makedirs(path, exist_ok=True)
 
 param = {
     "TS": {},
+    "ES": {"M": args.d_index},
+    "IS:Sphere": {"M": args.d_index, "haar": False},
+    "IS:Haar": {"M": args.d_index, "haar": True},
     "BayesUCB": {},
     "GPUCB": {},
     "Tuned_GPUCB": {"c": 0.9},
@@ -54,13 +61,16 @@ param = {
 
 methods = [
     "TS",
-    "BayesUCB",
-    "GPUCB",
-    "Tuned_GPUCB",
-    "KG",
-    "KG_star",
-    "VIDS_approx",
-    "VIDS_sample",
+    "ES",
+    "IS:Sphere",
+    "IS:Haar",
+    # "BayesUCB",
+    # "GPUCB",
+    # "Tuned_GPUCB",
+    # "KG",
+    # "KG_star",
+    # "VIDS_approx",
+    # "VIDS_sample",
 ]
 
 with open(os.path.join(path, "config.json"), "wt") as f:

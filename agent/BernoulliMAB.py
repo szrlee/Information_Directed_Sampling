@@ -1,11 +1,6 @@
 """ Packages import """
 from agent.MAB import *
-from utils import (
-    rd_argmax,
-    haar_matrix,
-    sphere_matrix,
-    multi_haar_matrix,
-)
+from utils import rd_argmax
 import utils
 from scipy.stats import beta
 from copy import copy
@@ -35,6 +30,8 @@ class BetaBernoulliMAB(GenericMAB):
         self.flag = False
         self.optimal_arm = None
         self.threshold = 0.99
+
+        # Parameters used for Haar random matrix
         self.counter = 0
 
     @staticmethod
@@ -87,7 +84,7 @@ class BetaBernoulliMAB(GenericMAB):
         Sexpa[arm] += exp_noise * reward
         Sexpb[arm] += exp_noise * (1 - reward)
 
-    def ES(self, T, M):
+    def ES(self, T, M=10):
         Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         Sexpa, Sexpb = self.init_exp_list(alpha=1, beta=1, M=M)
         # theta = np.zeros(self.nb_arms, M)
@@ -107,60 +104,11 @@ class BetaBernoulliMAB(GenericMAB):
 
         return reward, expected_regret
 
-    def rand_vec_gen(self, M, N=1, haar=False):
-        """
-        Random vector generation
-        mainly for index sampling
-        """
-        assert N > 0
-        if not haar:
-            return sphere_matrix(N, M)
-        # generate vectors from Haar random matrix
-        if N == 1:
-            if self.counter == 0:
-                self.V = haar_matrix(M)
-            v = self.V[:, self.counter]
-            self.counter = (self.counter + 1) % M
-            return v
-        else:
-            return multi_haar_matrix(N, M)
-
-    def update_xi_list(self, arm, Sxia, M, haar):
-        Sxia[[arm]] += self.rand_vec_gen(M, haar=haar)
-
-    def IS(self, T, M, haar):
-        """
-        Implementation of Index Sampling (IS) algorithm for Bernoulli Bandit Problems with beta prior
-        :param T: int, time horizon
-        :return: np.arrays, reward obtained by the policy and sequence of chosen arms
-        """
-        mu_0 = (1 / 2) * np.ones(self.nb_arms)  # (a /(a+b))
-        b_0 = self.rand_vec_gen(M, N=self.nb_arms, haar=haar)  # shape N x M
-        sigma = 1 / 4  # p(1-p) <= 1/4
-        sigma_0 = 1 / 12  # (ab/(a+b+1)(a+b)**2)
-        beta = sigma**2 / sigma_0**2
-        Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
-        Sxia = np.zeros((self.nb_arms, M))
-
-        theta = np.zeros(self.nb_arms)
-        mu = np.zeros(self.nb_arms)
-        m = np.zeros((self.nb_arms, M))
-        for t in range(T):
-            if t < self.nb_arms:
-                arm = t
-            else:
-                for k in range(self.nb_arms):
-                    mu[k] = (Sa[k] + beta * mu_0[k]) / (Na[k] + beta)
-                    m[k] = (sigma * Sxia[k] + beta * sigma_0 * b_0[k]) / (Na[k] + beta)
-                    # TODO: Need to move this IS implementation to GaussianMAB (z-dependent Gaussian)
-                    # TODO: Need to implement z-dependent Exponential noise here
-                    z = np.random.normal(0, 1, M)
-                    theta[k] = mu[k] + m[k] @ z
-                arm = rd_argmax(theta)
-            self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            self.update_xi_list(arm, Sxia, M, haar)
-
-        return reward, expected_regret
+    def IS(self, T, M=10):
+        raise NotImplemented
+        # TODO: Need to implement z-dependent (approximate) Exponential noise
+        # ( z^\top (\sum_{t} \xi_{1, t}) )^2 \neq (\approx) \sum_{t} (z^\top \xi_{1, t})^2
+        # because we need to incrementally update sxia instead store all xia in the history and recompute each time we sample a new z
 
     def BayesUCB(self, T, p1, p2, c=0):
         """
@@ -330,7 +278,7 @@ class BetaBernoulliMAB(GenericMAB):
             # Posterior update
             beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1 - reward[t]
             if display_results:
-                utils.display_results(delta, g, delta**2 / g, p_star)
+                utils.display_results(delta, g, delta ** 2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
 
         return reward, expected_regret
@@ -439,7 +387,7 @@ class BetaBernoulliMAB(GenericMAB):
                         for a in range(self.nb_arms)
                     ]
                 )
-                arm = rd_argmax(-(delta**2) / v)
+                arm = rd_argmax(-(delta ** 2) / v)
             else:
                 g = np.array(
                     [

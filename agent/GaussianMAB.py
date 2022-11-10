@@ -23,9 +23,9 @@ class GaussianMAB(GenericMAB):
         super().__init__(envs=[env] * n_actions, frequentist=env.startswith("Freq"))
         # Init parameters
         if "Bernoulli" in env:
-            self.mu0 = 1 / 2  # (a /(a+b))
-            self.eta = 1 / 4  # p(1-p) <= 1/4
-            self.s0 = 1 / 12  # (ab/(a+b+1)(a+b)**2)
+            self.mu0 = 1 / 2  # (a /(a+b)) = 1/2
+            self.eta = 1  # p(1-p) <= 1/4
+            self.s0 = 1  # (ab/(a+b+1)(a+b)**2) = 1/12
         elif "Gaussian" in env:
             self.mu0 = 0  # prior mean
             self.eta = 1  # noise std

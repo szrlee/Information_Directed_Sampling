@@ -46,8 +46,8 @@ os.makedirs(path, exist_ok=True)
 
 
 param = {
-    "TS": {},
-    "ES": {"M": args.d_index},
+    "TS:G": {},
+    "ES:G": {"M": args.d_index},
     "IS:Sphere": {"M": args.d_index, "haar": False},
     "IS:Haar": {"M": args.d_index, "haar": True},
     "BayesUCB": {},
@@ -60,8 +60,8 @@ param = {
 }
 
 methods = [
-    "TS",
-    "ES",
+    "TS:G",
+    "ES:G",
     "IS:Sphere",
     "IS:Haar",
     # "BayesUCB",

@@ -46,8 +46,8 @@ os.makedirs(path, exist_ok=True)
 
 
 param = {
-    "TS": {},
-    "ES": {"M": args.d_index},
+    "TS:B": {},
+    "ES:E": {"M": args.d_index},
     "BayesUCB": {"p1": 0.01, "p2": 0.1, "c": 0},
     "IDS_approx": {"N": 1000, "display_results": False},
     "KG": {},
@@ -57,8 +57,8 @@ param = {
 }
 
 methods = [
-    "TS",
-    "ES",
+    "TS:B",
+    "ES:E",
     # "BayesUCB",
     # "IDS_approx",
     # "KG",

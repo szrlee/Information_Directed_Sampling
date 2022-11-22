@@ -142,11 +142,10 @@ class GaussianMAB(GenericMAB):
             if t < self.nb_arms:
                 arm = t
             else:
-                for k in range(self.nb_arms):
-                    mu[k] = (Sa[k] + beta * mu_0[k]) / (Na[k] + beta)
-                    m[k] = (eta * Sxia[k] + beta * s0 * b_0[k]) / (Na[k] + beta)
-                    z = np.random.normal(0, 1, M)
-                    theta[k] = mu[k] + m[k] @ z
+                mu = np.diag(1 / (Na + beta)) @ (Sa + beta * mu_0)
+                m = np.diag(1 / (Na + beta)) @ (eta * Sxia + beta * s0 * b_0)
+                z = np.random.normal(0, 1, M)
+                theta = mu + m @ z
                 arm = rd_argmax(theta)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
             self.update_xi_list(arm, Sxia, M, haar)

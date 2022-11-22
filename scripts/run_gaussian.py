@@ -60,8 +60,8 @@ param = {
 }
 
 methods = [
-    "TS:G",
-    "ES:G",
+    # "TS:G",
+    # "ES:G",
     "IS:Sphere",
     "IS:Haar",
     # "BayesUCB",

@@ -49,15 +49,15 @@ class LinMAB:
         s_inv = np.linalg.inv(sigma)
         ffT = np.outer(f, f)
         mu_ = np.dot(
-            np.linalg.inv(s_inv + ffT / self.eta**2),
-            np.dot(s_inv, mu) + r * f / self.eta**2,
+            np.linalg.inv(s_inv + ffT / self.eta ** 2),
+            np.dot(s_inv, mu) + r * f / self.eta ** 2,
         )
-        sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
+        sigma_ = np.linalg.inv(s_inv + ffT / self.eta ** 2)
         return r, mu_, sigma_
 
     def rankone_update(self, f, Sigma):
         ffT = np.outer(f, f)
-        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta**2 + f @ Sigma @ f)
+        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta ** 2 + f @ Sigma @ f)
 
     def updatePosterior_(self, a, sigma, p):
         """
@@ -70,7 +70,7 @@ class LinMAB:
         """
         f, r = self.features[a], self.reward(a)[0]
         sigma_ = self.rankone_update(f, sigma)
-        p_ = p + ((r * f) / self.eta**2)
+        p_ = p + ((r * f) / self.eta ** 2)
         mu_ = sigma_ @ p_
         return r, mu_, sigma_, p_
 
@@ -123,13 +123,40 @@ class LinMAB:
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             # Update M models with algorithmic random perturbation
             P_t += np.outer(
-                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta**2
+                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta ** 2
             )
             A_t = Sigma_t @ P_t
 
         return reward, expected_regret
 
-    def rand_vec_gen(self, M, N=1, haar=False):
+    def ES_pm(self, T, M=10):
+        """
+        Ensemble sampling with positive and negative index
+        """
+        reward, expected_regret = np.zeros(T), np.zeros(T)
+        mu_t, Sigma_t = self.initPrior()
+        # A_t = np.zeros((self.d, M))
+        # P_t = np.zeros((self.d, M))
+        B = np.random.normal(0, 1, (self.d, M))
+        # print(B.shape, np.linalg.norm(B, axis=1))
+        A_t = mu_t.reshape((self.d, 1)) + sqrtm(Sigma_t) @ B
+        P_t = np.linalg.inv(Sigma_t) @ A_t
+        for t in range(T):
+            i = np.random.choice(M, 1)[0]
+            theta_t = A_t[:, [i]]
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            Sigma_t = self.rankone_update(f_t, Sigma_t)
+            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+            # Update M models with algorithmic random perturbation
+            P_t += np.outer(
+                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta ** 2
+            )
+            A_t = Sigma_t @ P_t
+
+        return reward, expected_regret
+
+    def sphere_rand_gen(self, M, N=1, haar=False):
         """
         Random vector generation
         """
@@ -146,14 +173,28 @@ class LinMAB:
         else:
             return multi_haar_matrix(N, M)
 
-    def IS(self, T, M=10, haar=False):
+    def IS(self, T, M=10, haar=False, index="normal", perturbed_noise="sphere"):
         """
         Index Sampling
+        Protocol:
+        1. E[ norm(perturbed_noise) ] = 1
+        2. E[ norm(index) ] = sqrt(M)
         """
         reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, Sigma_t = self.initPrior()
         # Sample matrix B with size d x M
-        B = self.rand_vec_gen(M, N=self.d, haar=haar)
+        if perturbed_noise == "sphere":
+            B = self.sphere_rand_gen(M, N=self.d, haar=haar)
+        elif perturbed_noise == "gaussian":
+            B = np.random.normal(0, 1, (self.d, M)) / np.sqrt(M)
+        elif perturbed_noise == "pm_coordinate":
+            # TODO Need to debug
+            i = np.random.choice(M, self.d)
+            sign = np.random.choice(1, self.d) - 1
+            B = np.zeros((self.d, M))
+            B[np.arange(self.d), i] = sign
+        else:
+            raise NotImplementedError
         # print(B.shape, np.linalg.norm(B, axis=1))
         A_t = sqrtm(Sigma_t) @ B
         S_inv = np.linalg.inv(Sigma_t)
@@ -162,7 +203,18 @@ class LinMAB:
 
         for t in range(T):
             # index sampling
-            z = np.random.normal(0, 1, M)
+            if index == "normal":
+                z = np.random.normal(0, 1, M)
+            elif index == "pm_coordinate":
+                # TODO Need to debug
+                i = np.random.choice(M, 1)[0]
+                sign = np.random.choice(1, 1)[0] - 1
+                z = np.zeros(M)
+                z[i] = np.sqrt(M) * sign
+            elif index == "sphere":
+                z = np.sqrt(M) * self.sphere_rand_gen(M, haar=haar)[0]
+            else:
+                raise NotImplementedError
             theta_t = A_t @ z + mu_t
             # action selection
             a_t = rd_argmax(np.dot(self.features, theta_t))
@@ -174,7 +226,18 @@ class LinMAB:
             # compute regret
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             # Update A
-            b_t = self.rand_vec_gen(M, haar=haar)
+            if perturbed_noise == "sphere":
+                b_t = self.sphere_rand_gen(M, haar=haar)
+            elif perturbed_noise == "gaussian":
+                b_t = np.random.normal(0, 1, M) / np.sqrt(M)
+            elif perturbed_noise == "pm_coordinate":
+                # TODO Need to debug
+                i = np.random.choice(M, 1)[0]
+                # sign = np.random.choice(1, 1)[0] - 1
+                b_t = np.zeros(M)
+                b_t[i] = np.random.choice(1, 1)[0] - 1
+            else:
+                raise NotImplementedError
             P_t += np.outer(f_t, b_t) / self.eta
             A_t = Sigma_t @ P_t
 
@@ -332,7 +395,7 @@ class LinMAB:
         delta = np.array(
             [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
         )
-        arm = rd_argmax(-(delta**2) / (v + 1e-20))
+        arm = rd_argmax(-(delta ** 2) / (v + 1e-20))
         return arm, p_a
 
     def VIDS_sample(self, T, M=10000):

@@ -191,7 +191,7 @@ class LinMAB:
             # TODO Need to debug
             i = np.random.choice(M, self.d)
             B = np.zeros((self.d, M))
-            B[np.arange(self.d), i] = random_sign()
+            B[np.arange(self.d), i] = random_sign(self.d)
         else:
             raise NotImplementedError
         # print(B.shape, np.linalg.norm(B, axis=1))

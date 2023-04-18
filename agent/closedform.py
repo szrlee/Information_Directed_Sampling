@@ -1,6 +1,6 @@
 """ Packages import """
 import numpy as np
-from utils import rd_argmax, haar_matrix, sphere_matrix, multi_haar_matrix
+from utils import rd_argmax, haar_matrix, sphere_matrix, multi_haar_matrix, random_sign
 from scipy.stats import norm
 from scipy.linalg import sqrtm
 
@@ -190,9 +190,8 @@ class LinMAB:
         elif perturbed_noise == "pm_coordinate":
             # TODO Need to debug
             i = np.random.choice(M, self.d)
-            sign = np.random.choice(1, self.d) - 1
             B = np.zeros((self.d, M))
-            B[np.arange(self.d), i] = sign
+            B[np.arange(self.d), i] = random_sign()
         else:
             raise NotImplementedError
         # print(B.shape, np.linalg.norm(B, axis=1))
@@ -208,9 +207,8 @@ class LinMAB:
             elif index == "pm_coordinate":
                 # TODO Need to debug
                 i = np.random.choice(M, 1)[0]
-                sign = np.random.choice(1, 1)[0] - 1
                 z = np.zeros(M)
-                z[i] = np.sqrt(M) * sign
+                z[i] = np.sqrt(M) * random_sign()
             elif index == "sphere":
                 z = np.sqrt(M) * self.sphere_rand_gen(M, haar=haar)[0]
             else:
@@ -233,9 +231,8 @@ class LinMAB:
             elif perturbed_noise == "pm_coordinate":
                 # TODO Need to debug
                 i = np.random.choice(M, 1)[0]
-                # sign = np.random.choice(1, 1)[0] - 1
                 b_t = np.zeros(M)
-                b_t[i] = np.random.choice(1, 1)[0] - 1
+                b_t[i] = random_sign()
             else:
                 raise NotImplementedError
             P_t += np.outer(f_t, b_t) / self.eta

@@ -357,6 +357,10 @@ def build_bernoulli_finite_set(L, K):
     return p, q, r
 
 
+def random_sign():
+    return 1 if rd.random() < 0.5 else -1
+
+
 def set_seed(seed, use_torch=False):
     np.random.seed(seed)
     rd.seed(seed)

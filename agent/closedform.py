@@ -49,15 +49,15 @@ class LinMAB:
         s_inv = np.linalg.inv(sigma)
         ffT = np.outer(f, f)
         mu_ = np.dot(
-            np.linalg.inv(s_inv + ffT / self.eta ** 2),
-            np.dot(s_inv, mu) + r * f / self.eta ** 2,
+            np.linalg.inv(s_inv + ffT / self.eta**2),
+            np.dot(s_inv, mu) + r * f / self.eta**2,
         )
-        sigma_ = np.linalg.inv(s_inv + ffT / self.eta ** 2)
+        sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
         return r, mu_, sigma_
 
     def rankone_update(self, f, Sigma):
         ffT = np.outer(f, f)
-        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta ** 2 + f @ Sigma @ f)
+        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta**2 + f @ Sigma @ f)
 
     def updatePosterior_(self, a, sigma, p):
         """
@@ -70,7 +70,7 @@ class LinMAB:
         """
         f, r = self.features[a], self.reward(a)[0]
         sigma_ = self.rankone_update(f, sigma)
-        p_ = p + ((r * f) / self.eta ** 2)
+        p_ = p + ((r * f) / self.eta**2)
         mu_ = sigma_ @ p_
         return r, mu_, sigma_, p_
 
@@ -123,7 +123,7 @@ class LinMAB:
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             # Update M models with algorithmic random perturbation
             P_t += np.outer(
-                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta ** 2
+                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta**2
             )
             A_t = Sigma_t @ P_t
 
@@ -150,7 +150,7 @@ class LinMAB:
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
             # Update M models with algorithmic random perturbation
             P_t += np.outer(
-                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta ** 2
+                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta**2
             )
             A_t = Sigma_t @ P_t
 
@@ -192,6 +192,8 @@ class LinMAB:
             i = np.random.choice(M, self.d)
             B = np.zeros((self.d, M))
             B[np.arange(self.d), i] = random_sign(self.d)
+        elif perturbed_noise == "unif_grid":
+            B = (2 * np.random.binomial(1, 0.5, (self.d, M)) - 1) / np.sqrt(M)
         else:
             raise NotImplementedError
         # print(B.shape, np.linalg.norm(B, axis=1))
@@ -211,6 +213,8 @@ class LinMAB:
                 z[i] = np.sqrt(M) * random_sign()
             elif index == "sphere":
                 z = np.sqrt(M) * self.sphere_rand_gen(M, haar=haar)[0]
+            elif index == "unif_grid":
+                z = 2 * np.random.binomial(1, 0.5, M) - 1
             else:
                 raise NotImplementedError
             theta_t = A_t @ z + mu_t
@@ -233,6 +237,8 @@ class LinMAB:
                 i = np.random.choice(M, 1)[0]
                 b_t = np.zeros(M)
                 b_t[i] = random_sign()
+            elif perturbed_noise == "unif_grid":
+                b_t = (2 * np.random.binomial(1, 0.5, M) - 1) / np.sqrt(M)
             else:
                 raise NotImplementedError
             P_t += np.outer(f_t, b_t) / self.eta
@@ -392,7 +398,7 @@ class LinMAB:
         delta = np.array(
             [rho_star - np.dot(self.features[a], mu) for a in range(self.n_a)]
         )
-        arm = rd_argmax(-(delta ** 2) / (v + 1e-20))
+        arm = rd_argmax(-(delta**2) / (v + 1e-20))
         return arm, p_a
 
     def VIDS_sample(self, T, M=10000):

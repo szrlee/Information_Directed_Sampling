@@ -31,6 +31,7 @@ def get_args():
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
     parser.add_argument("--d-index", type=int, default=10)
+    parser.add_argument("--n-arms", type=int, default=30)
     parser.add_argument("--d-theta", type=int, default=10)
     parser.add_argument("--logdir", type=str, default="./results/bandit")
     args = parser.parse_known_args()[0]
@@ -181,10 +182,14 @@ methods = [
 ]
 
 game_config = {
-    "FreqRusso": {"n_features": args.d_theta, "n_arms": 30, "T": args.time_period},
+    "FreqRusso": {
+        "n_features": args.d_theta,
+        "n_arms": args.n_arms,
+        "T": args.time_period,
+    },
     "movieLens": {"n_features": 30, "n_arms": 207, "T": args.time_period},
-    "Russo": {"n_features": args.d_theta, "n_arms": 30, "T": args.time_period},
-    "Zhang": {"n_features": args.d_theta, "n_arms": 10, "T": args.time_period},
+    "Russo": {"n_features": args.d_theta, "n_arms": args.n_arms, "T": args.time_period},
+    "Zhang": {"n_features": args.d_theta, "n_arms": args.n_arms, "T": args.time_period},
 }
 
 with open(os.path.join(path, "config.json"), "wt") as f:

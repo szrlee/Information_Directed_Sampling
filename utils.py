@@ -37,15 +37,15 @@ mapping_methods_labels = {
     "ES:E": "Ensemble Sampling - Exponential",
     "IS:Sphere": "Index Sampling: Sphere",
     "IS:Haar": "Index Sampling: Haar",
-    "IS:Normal_Sphere": "Index Sampling: Normal index, Sphere noise",
-    "IS:Normal_Gaussian": "Index Sampling: Normal index, Gaussian noise",
-    "IS:Normal_PMCoord": "Index Sampling: Normal index, PMCoord noise",
-    "IS:Sphere_Sphere": "Index Sampling: Sphere index, Sphere noise",
-    "IS:Sphere_Gaussian": "Index Sampling: Sphere index, Gaussian noise",
-    "IS:Sphere_PMCoord": "Index Sampling: Sphere index, PMCoord noise",
-    "IS:PMCoord_Gaussian": "Index Sampling: PMCoord index, Gaussian noise",
-    "IS:PMCoord_Sphere": "Index Sampling: PMCoord index, Sphere noise",
-    "IS:PMCoord_PMCoord": "Index Sampling: PMCoord index, PMCoord noise",
+    # "IS:Normal_Sphere": "Index Sampling: Normal index, Sphere noise",
+    # "IS:Normal_Gaussian": "Index Sampling: Normal index, Gaussian noise",
+    # "IS:Normal_PMCoord": "Index Sampling: Normal index, PMCoord noise",
+    # "IS:Sphere_Sphere": "Index Sampling: Sphere index, Sphere noise",
+    # "IS:Sphere_Gaussian": "Index Sampling: Sphere index, Gaussian noise",
+    # "IS:Sphere_PMCoord": "Index Sampling: Sphere index, PMCoord noise",
+    # "IS:PMCoord_Gaussian": "Index Sampling: PMCoord index, Gaussian noise",
+    # "IS:PMCoord_Sphere": "Index Sampling: PMCoord index, Sphere noise",
+    # "IS:PMCoord_PMCoord": "Index Sampling: PMCoord index, PMCoord noise",
     "TS_hyper": "TS - HyperModel",
     "TS_hyper:Reset": "TS - HyperModel Reset",
     "TS_hyper:FG": "TS - HyperModel FG",
@@ -82,12 +82,19 @@ mapping_methods_colors = {
     "IS:Normal_Sphere": "red",
     "IS:Normal_Gaussian": "blue",
     "IS:Normal_PMCoord": "green",
-    "IS:Sphere_Sphere": "brown",
-    "IS:Sphere_Gaussian": "salmon",
-    "IS:Sphere_PMCoord": "violet",
-    "IS:PMCoord_Gaussian": "purple",
-    "IS:PMCoord_Sphere": "yellow",
-    "IS:PMCoord_PMCoord": "cyan",
+    "IS:Normal_UnifGrid": "yellow",
+    "IS:Sphere_Sphere": "red",
+    "IS:Sphere_Gaussian": "blue",
+    "IS:Sphere_PMCoord": "green",
+    "IS:Sphere_UnifGrid": "yellow",
+    "IS:PMCoord_Gaussian": "red",
+    "IS:PMCoord_Sphere": "blue",
+    "IS:PMCoord_PMCoord": "green",
+    "IS:PMCoord_UnifGrid": "yellow",
+    "IS:UnifGrid_Gaussian": "red",
+    "IS:UnifGrid_Sphere": "blue",
+    "IS:UnifGrid_PMCoord": "green",
+    "IS:UnifGrid_UnifGrid": "yellow",
     "IS:Sphere": "red",
     "IS:Haar": "blue",
     "TS_hyper": "green",
@@ -111,6 +118,26 @@ mapping_methods_colors = {
 }
 
 
+mapping_methods_markers = {
+    "IS:Normal_Sphere": ".",
+    "IS:Normal_Gaussian": ".",
+    "IS:Normal_PMCoord": ".",
+    "IS:Normal_UnifGrid": ".",
+    "IS:Sphere_Sphere": "v",
+    "IS:Sphere_Gaussian": "v",
+    "IS:Sphere_PMCoord": "v",
+    "IS:Sphere_UnifGrid": "v",
+    "IS:PMCoord_Gaussian": "s",
+    "IS:PMCoord_Sphere": "s",
+    "IS:PMCoord_PMCoord": "s",
+    "IS:PMCoord_UnifGrid": "s",
+    "IS:UnifGrid_Gaussian": "x",
+    "IS:UnifGrid_Sphere": "x",
+    "IS:UnifGrid_PMCoord": "x",
+    "IS:UnifGrid_UnifGrid": "x",
+}
+
+
 def labelColor(methods):
     """
     Map methods to labels and colors for regret curves
@@ -125,7 +152,11 @@ def labelColor(methods):
         mapping_methods_colors[m] if m in mapping_methods_colors.keys() else None
         for m in methods
     ]
-    return labels, colors
+    markers = [
+        mapping_methods_markers[m] if m in mapping_methods_markers.keys() else None
+        for m in methods
+    ]
+    return labels, colors, markers
 
 
 def rd_argmax(vector):
@@ -173,7 +204,7 @@ def display_results(delta, g, ratio, p_star):
     print("p_star {}".format(p_star))
 
 
-def plotRegret(labels, regret, colors, title, path, log=False):
+def plotRegret(labels, regret, colors, title, path, log=False, markers=None):
     """
     Plot Bayesian regret
     :param labels: list, list of labels for the different curves
@@ -182,28 +213,26 @@ def plotRegret(labels, regret, colors, title, path, log=False):
     :param title: string, plot's title
     """
 
-    all_regrets = regret["all_regrets"]
+    low_CI_bound = regret["low_CI_bound"]
+    high_CI_bound = regret["high_CI_bound"]
     mean_regret = regret["mean_regret"]
-    # std_regret = regret['std_regret']
-    # min_regret = regret['min_regret']
-    # max_regret = regret['max_regret']
     plt.figure(figsize=(10, 8), dpi=80)
     # plt.rcParams["figure.figsize"] = (16, 9)
 
     T = mean_regret.shape[1]
-    print(T)
     for i, l in enumerate(labels):
         # if 'TS' not in l:
         #     continue
         c = cmap[i] if not colors else colors[i]
+        m = None if not markers else markers[i]
         x = np.arange(T)
-        low_CI_bound, high_CI_bound = st.t.interval(
-            0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets[i])
-        )
+        # low_CI_bound, high_CI_bound = st.t.interval(
+        # 0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets[i])
+        # )
         # low_CI_bound = np.quantile(all_regrets[i], 0.05, axis=0)
         # high_CI_bound = np.quantile(all_regrets[i], 0.95, axis=0)
-        plt.plot(x, mean_regret[i], c=c, label=l)
-        plt.fill_between(x, low_CI_bound, high_CI_bound, color=c, alpha=0.2)
+        plt.plot(x, mean_regret[i], c=c, label=l, marker=m)
+        plt.fill_between(x, low_CI_bound[i], high_CI_bound[i], color=c, alpha=0.2)
         if log:
             plt.yscale("log")
     plt.grid(color="grey", linestyle="--", linewidth=0.5)
@@ -238,9 +267,11 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
     :param T: Time horizon
     :return: Dictionnary with results from the experiments
     """
-    all_regrets = np.zeros((len(methods), n_expe, T), dtype=np.float32)
-    # final_regrets = np.zeros((len(methods), n_expe))
-    # q, quantiles, means, std = np.linspace(0, 1, 21), {}, {}, {}
+    mean_regret = np.zeros((len(methods), T), dtype=np.float32)
+    low_CI_bound = np.zeros((len(methods), T), dtype=np.float32)
+    high_CI_bound = np.zeros((len(methods), T), dtype=np.float32)
+    all_regrets = np.zeros((n_expe, T), dtype=np.float32)
+
     os.makedirs(os.path.join(path, "csv_data"), exist_ok=True)
     for i, m in enumerate(methods):
         set_seed(2022, use_torch=use_torch)
@@ -248,39 +279,26 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
         file_name = m.replace(":", "_").replace(" ", "_").lower()
         file = open(os.path.join(path, "csv_data", f"{file_name}.csv"), "w+t")
         writer = csv.writer(file, delimiter=",")
+        # Loop for n_expe repeated experiments
         for j in tqdm(range(n_expe)):
             model = models[j]
             alg = model.__getattribute__(alg_name)
             args = inspect.getfullargspec(alg)[0][2:]
             args = [T] + [param_dic[m][i] for i in args]
             reward, regret = alg(*args)
-            all_regrets[i, j, :] = np.cumsum(regret)
-            writer.writerow(all_regrets[i, j, :].astype(np.float32))
-        print(f"{m}: {np.mean(all_regrets[i], axis=0)[-1]}")
+            all_regrets[j, :] = np.cumsum(regret)
+            writer.writerow(all_regrets[j, :].astype(np.float32))
+        # Summary for one method (i, m)
+        mean_regret[i] = np.mean(all_regrets, axis=0)
+        low_CI_bound[i], high_CI_bound[i] = st.t.interval(
+            0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets)
+        )
+        print(f"{m}: {np.mean(all_regrets, axis=0)[-1]}")
 
-    # for j, m in enumerate(methods):
-    #     for i in range(n_expe):
-    #         final_regrets[j, i] = all_regrets[j, i, -1]
-    #         quantiles[m], means[m], std[m] = (
-    #             np.quantile(final_regrets[j, :], q),
-    #             final_regrets[j, :].mean(),
-    #             final_regrets[j, :].std(),
-    #         )
-
-    # min_regret = all_regrets.min(axis=1)
-    # max_regret = all_regrets.max(axis=1)
-    # std_regret = all_regrets.std(axis=1)
-    mean_regret = all_regrets.mean(axis=1)
     results = {
-        # "min_regret": min_regret,
-        # "max_regret": max_regret,
-        # "std_regret": std_regret,
         "mean_regret": mean_regret,
-        "all_regrets": all_regrets,
-        # "final_regrets": final_regrets,
-        # "quantiles": quantiles,
-        # "means": means,
-        # "std": std,
+        "low_CI_bound": low_CI_bound,
+        "high_CI_bound": high_CI_bound,
     }
     if models[0].store_IDS:
         IDS_res = [m.IDS_results for m in models]

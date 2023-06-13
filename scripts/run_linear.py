@@ -219,13 +219,14 @@ check_time = False
 
 # %%
 # Regret
-labels, colors = utils.labelColor(methods)
+labels, colors, markers = utils.labelColor(methods)
 expe_params = {
     "n_expe": args.n_expe,
     "methods": methods,
     "param_dic": param,
     "labels": labels,
     "colors": colors,
+    "markers": markers,
     "path": path,
     "problem": game,
     **game_config[game],

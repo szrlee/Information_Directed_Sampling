@@ -119,6 +119,7 @@ def LinMAB_expe(
     param_dic,
     labels,
     colors,
+    markers,
     path,
     problem="FreqRusso",
     doplot=True,
@@ -180,7 +181,7 @@ def LinMAB_expe(
     print("Begin experiments on '{}'".format(title))
     results = storeRegret(models, methods, param_dic, n_expe, T, path)
     if doplot:
-        plotRegret(labels, results, colors, title, path, log=log)
+        plotRegret(labels, results, colors, title, path, log=log, markers=markers)
     # if track_ids:
     #     plot_IDS_results(T, n_expe, results["IDS_results"])
     return results

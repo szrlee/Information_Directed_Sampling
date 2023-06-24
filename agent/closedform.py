@@ -1,6 +1,14 @@
 """ Packages import """
 import numpy as np
-from utils import rd_argmax, haar_matrix, sphere_matrix, multi_haar_matrix, random_sign
+from utils import (
+    rd_argmax,
+    sample_noise,
+    # haar_matrix,
+    # sphere_matrix,
+    # multi_haar_matrix,
+    random_sign,
+    approx_err,
+)
 from scipy.stats import norm
 from scipy.linalg import sqrtm
 
@@ -13,11 +21,12 @@ class LinMAB:
         :param env: ArmGaussianLinear object
         """
         self.env = env
-        self.expect_regret, self.n_a, self.d, self.features = (
+        self.expect_regret, self.n_a, self.d, self.features, self.pess_regret = (
             env.expect_regret,
             env.n_actions,
             env.n_features,
             env.features,
+            env.pessimism_regret,
         )
         self.reward, self.eta = env.reward, env.eta
         self.prior_sigma = env.alg_prior_sigma
@@ -100,7 +109,11 @@ class LinMAB:
 
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
 
-        return reward, expected_regret
+        dic = {
+            "reward": reward,
+            "expected_regret": expected_regret,
+        }
+        return dic
 
     def ES(self, T, M=10):
         """
@@ -156,95 +169,135 @@ class LinMAB:
 
         return reward, expected_regret
 
-    def sphere_rand_gen(self, M, N=1, haar=False):
-        """
-        Random vector generation
-        """
-        assert N > 0
-        if not haar:
-            return sphere_matrix(N, M)
-        # generate vectors from Haar random matrix
-        if N == 1:
-            if self.counter == 0:
-                self.V = haar_matrix(M)
-            v = self.V[:, self.counter]
-            self.counter = (self.counter + 1) % M
-            return v
-        else:
-            return multi_haar_matrix(N, M)
+    # def sphere_rand_gen(self, M, N=1, haar=False):
+    #     """
+    #     Random vector generation
+    #     """
+    #     assert N > 0
+    #     if not haar:
+    #         return sphere_matrix(N, M)
+    #     # generate vectors from Haar random matrix
+    #     if N == 1:
+    #         if self.counter == 0:
+    #             self.V = haar_matrix(M)
+    #         v = self.V[:, self.counter]
+    #         self.counter = (self.counter + 1) % M
+    #         return v
+    #     else:
+    #         return multi_haar_matrix(N, M)
 
-    def IS(self, T, M=10, haar=False, index="normal", perturbed_noise="sphere"):
+    def IS(
+        self,
+        T,
+        M=10,
+        haar=False,
+        index="gaussian",
+        perturbed_noise="sphere",
+        scheme="ts",
+    ):
         """
         Index Sampling
         Protocol:
         1. E[ norm(perturbed_noise) ] = 1
         2. E[ norm(index) ] = sqrt(M)
         """
-        reward, expected_regret = np.zeros(T), np.zeros(T)
-        mu_t, Sigma_t = self.initPrior()
-        # Sample matrix B with size d x M
-        if perturbed_noise == "sphere":
-            B = self.sphere_rand_gen(M, N=self.d, haar=haar)
-        elif perturbed_noise == "gaussian":
-            B = np.random.normal(0, 1, (self.d, M)) / np.sqrt(M)
-        elif perturbed_noise == "pm_coordinate":
-            # TODO Need to debug
-            i = np.random.choice(M, self.d)
-            B = np.zeros((self.d, M))
-            B[np.arange(self.d), i] = random_sign(self.d)
-        elif perturbed_noise == "unif_grid":
-            B = (2 * np.random.binomial(1, 0.5, (self.d, M)) - 1) / np.sqrt(M)
-        else:
-            raise NotImplementedError
-        # print(B.shape, np.linalg.norm(B, axis=1))
-        A_t = sqrtm(Sigma_t) @ B
-        S_inv = np.linalg.inv(Sigma_t)
-        P_t = S_inv @ A_t
-        p_t = S_inv @ mu_t
 
-        for t in range(T):
-            # index sampling
-            if index == "normal":
-                z = np.random.normal(0, 1, M)
-            elif index == "pm_coordinate":
-                # TODO Need to debug
-                i = np.random.choice(M, 1)[0]
-                z = np.zeros(M)
-                z[i] = np.sqrt(M) * random_sign()
-            elif index == "sphere":
-                z = np.sqrt(M) * self.sphere_rand_gen(M, haar=haar)[0]
-            elif index == "unif_grid":
-                z = 2 * np.random.binomial(1, 0.5, M) - 1
+        # initialization for synthesis
+        reward, expected_regret = np.zeros(T), np.zeros(T)
+        norm_err, set_err, a_t_err = np.zeros(T), np.zeros(T), np.zeros(T)
+        tilde_norm_err, tilde_set_err, tilde_a_t_err = (
+            np.zeros(T),
+            np.zeros(T),
+            np.zeros(T),
+        )
+        pess_regret, est_regret = np.zeros(T), np.zeros(T)
+        lmax, lmin = np.zeros(T), np.zeros(T)
+        pot, approx_pot = np.zeros(T), np.zeros(T)
+
+        def index_sampling(A, mu, index, scheme="ts"):
+            M = A.shape[1]
+            if scheme == "ts":
+                z = sample_noise(index, M)[0] * np.sqrt(M)
+                img_theta = A @ z + mu
+                return np.dot(self.features, img_theta)
+            elif scheme == "ots":
+                z = sample_noise(index, M, 10).T * np.sqrt(M)
+                img_theta = A @ z + np.expand_dims(mu, axis=1)
+                return np.max(np.dot(self.features, img_theta), axis=1)
             else:
                 raise NotImplementedError
-            theta_t = A_t @ z + mu_t
+
+        # Algorithm initialization
+        mu_t, Sigma_t = self.initPrior()
+        S_inv = np.linalg.inv(Sigma_t)
+        p_t = S_inv @ mu_t
+        sqrt_Sigma_t = sqrtm(Sigma_t)
+
+        # Initialization for factor A: Sample matrix B with size d x M
+        B = sample_noise(perturbed_noise, M, self.d)
+        A_t = sqrt_Sigma_t @ B
+        P_t = S_inv @ A_t
+        # for synthesis
+        tilde_B = sample_noise(perturbed_noise, M, self.d)
+        tilde_A_t = sqrt_Sigma_t @ tilde_B
+        tilde_P_t = S_inv @ tilde_A_t
+
+        # interaction
+        for t in range(T):
+            # index sampling
+            img_reward = index_sampling(A_t, mu_t, index, scheme=scheme)
             # action selection
-            a_t = rd_argmax(np.dot(self.features, theta_t))
+            a_t = rd_argmax(img_reward)
             # selected feature and reward feedback
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            # compute regret
+            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+
+            # Synthesis
+            norm_err[t], set_err[t], a_t_err[t], pot[t], approx_pot[t] = approx_err(
+                a_t, self.features, A_t @ A_t.T, Sigma_t
+            )
+            tilde_norm_err[t], tilde_set_err[t], tilde_a_t_err[t], _, _ = approx_err(
+                a_t, self.features, tilde_A_t @ tilde_A_t.T, Sigma_t
+            )
+            lmax[t] = np.linalg.norm(Sigma_t, 2)
+            lmin[t] = np.linalg.norm(Sigma_t, -2)
+            # pess_regret, est_regret, potential: pot, approx_potential: approx_pot
+            pess_regret[t] = self.pess_regret(a_t, self.features, img_reward)
+            est_regret[t] = expected_regret[t] - pess_regret[t]
+
             # incremental update on Sigma and mu
             # Sigma_t = self.rankone_update(f_t, Sigma_t)
             r_t, mu_t, Sigma_t, p_t = self.updatePosterior_(a_t, Sigma_t, p_t)
-            # compute regret
-            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            # Update A
-            if perturbed_noise == "sphere":
-                b_t = self.sphere_rand_gen(M, haar=haar)
-            elif perturbed_noise == "gaussian":
-                b_t = np.random.normal(0, 1, M) / np.sqrt(M)
-            elif perturbed_noise == "pm_coordinate":
-                # TODO Need to debug
-                i = np.random.choice(M, 1)[0]
-                b_t = np.zeros(M)
-                b_t[i] = random_sign()
-            elif perturbed_noise == "unif_grid":
-                b_t = (2 * np.random.binomial(1, 0.5, M) - 1) / np.sqrt(M)
-            else:
-                raise NotImplementedError
+
+            # Update covariance factor A
+            b_t = sample_noise(perturbed_noise, M)[0]
             P_t += np.outer(f_t, b_t) / self.eta
             A_t = Sigma_t @ P_t
 
-        return reward, expected_regret
+            # for synthesis
+            tilde_b_t = sample_noise(perturbed_noise, M)[0]
+            tilde_P_t += np.outer(f_t, tilde_b_t) / self.eta
+            tilde_A_t = Sigma_t @ tilde_P_t
+
+        dic = {
+            "reward": reward,
+            "expected_regret": expected_regret,
+            "pess_regret": pess_regret,
+            "est_regret": est_regret,
+            "potential": pot,
+            "approx_potential": approx_pot,
+            #
+            "norm_err": norm_err,
+            "set_err": set_err,
+            "a_t_err": a_t_err,
+            "tilde_norm_err": tilde_norm_err,
+            "tilde_set_err": tilde_set_err,
+            "tilde_a_t_err": tilde_a_t_err,
+            "lmax": lmax,
+            "lmin": lmin,
+        }
+        return dic
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """

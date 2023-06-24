@@ -6,8 +6,10 @@ import csv
 import random as rd
 import matplotlib.pyplot as plt
 import scipy.stats as st
+from scipy.linalg import sqrtm
 from tqdm import tqdm
 import inspect
+import pickle as pkl
 
 cmap = {
     0: "black",
@@ -82,19 +84,19 @@ mapping_methods_colors = {
     "IS:Normal_Sphere": "red",
     "IS:Normal_Gaussian": "blue",
     "IS:Normal_PMCoord": "green",
-    "IS:Normal_UnifGrid": "yellow",
+    "IS:Normal_UnifGrid": "brown",
     "IS:Sphere_Sphere": "red",
     "IS:Sphere_Gaussian": "blue",
     "IS:Sphere_PMCoord": "green",
-    "IS:Sphere_UnifGrid": "yellow",
+    "IS:Sphere_UnifGrid": "brown",
     "IS:PMCoord_Gaussian": "red",
     "IS:PMCoord_Sphere": "blue",
     "IS:PMCoord_PMCoord": "green",
-    "IS:PMCoord_UnifGrid": "yellow",
+    "IS:PMCoord_UnifGrid": "brown",
     "IS:UnifGrid_Gaussian": "red",
     "IS:UnifGrid_Sphere": "blue",
     "IS:UnifGrid_PMCoord": "green",
-    "IS:UnifGrid_UnifGrid": "yellow",
+    "IS:UnifGrid_UnifGrid": "brown",
     "IS:Sphere": "red",
     "IS:Haar": "blue",
     "TS_hyper": "green",
@@ -187,6 +189,28 @@ def sphere_matrix(N, M):
     return v
 
 
+def sample_noise(
+    noise_type,
+    M,
+    dim=1,
+):
+    # ensure the sampled vector is isotropic
+    assert M > 0
+    if noise_type == "sphere":
+        return sphere_matrix(dim, M)
+    elif noise_type == "gaussian":
+        return np.random.normal(0, 1, (dim, M)) / np.sqrt(M)
+    elif noise_type == "pm_coordinate":
+        i = np.random.choice(M, dim)
+        B = np.zeros((dim, M))
+        B[np.arange(dim), i] = random_sign(dim)
+        return B
+    elif noise_type == "unif_grid":
+        return (2 * np.random.binomial(1, 0.5, (dim, M)) - 1) / np.sqrt(M)
+    else:
+        raise NotImplementedError
+
+
 def multi_haar_matrix(N, M):
     v = np.zeros(((N // M + 1) * M, M))
     for _ in range(N // M + 1):
@@ -220,6 +244,8 @@ def plotRegret(labels, regret, colors, title, path, log=False, markers=None):
     # plt.rcParams["figure.figsize"] = (16, 9)
 
     T = mean_regret.shape[1]
+    # sort out how many points to drop: max_points = 25
+    ratio = max(T // 25, 1)
     for i, l in enumerate(labels):
         # if 'TS' not in l:
         #     continue
@@ -227,11 +253,11 @@ def plotRegret(labels, regret, colors, title, path, log=False, markers=None):
         m = None if not markers else markers[i]
         x = np.arange(T)
         # low_CI_bound, high_CI_bound = st.t.interval(
-        # 0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets[i])
+        # 0.95, T - 1, loc=mean_regret[i], scale=st.sem(cum_regrets[i])
         # )
-        # low_CI_bound = np.quantile(all_regrets[i], 0.05, axis=0)
-        # high_CI_bound = np.quantile(all_regrets[i], 0.95, axis=0)
-        plt.plot(x, mean_regret[i], c=c, label=l, marker=m)
+        # low_CI_bound = np.quantile(cum_regrets[i], 0.05, axis=0)
+        # high_CI_bound = np.quantile(cum_regrets[i], 0.95, axis=0)
+        plt.plot(x, mean_regret[i], c=c, label=l, marker=m, markevery=ratio)
         plt.fill_between(x, low_CI_bound[i], high_CI_bound[i], color=c, alpha=0.2)
         if log:
             plt.yscale("log")
@@ -270,30 +296,100 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
     mean_regret = np.zeros((len(methods), T), dtype=np.float32)
     low_CI_bound = np.zeros((len(methods), T), dtype=np.float32)
     high_CI_bound = np.zeros((len(methods), T), dtype=np.float32)
-    all_regrets = np.zeros((n_expe, T), dtype=np.float32)
+    # cum_regrets = np.zeros((n_expe, T), dtype=np.float32)
 
-    os.makedirs(os.path.join(path, "csv_data"), exist_ok=True)
+    os.makedirs(os.path.join(path, "data"), exist_ok=True)
     for i, m in enumerate(methods):
         set_seed(2022, use_torch=use_torch)
         alg_name = m.split(":")[0]
+        all_dic = {}
         file_name = m.replace(":", "_").replace(" ", "_").lower()
-        file = open(os.path.join(path, "csv_data", f"{file_name}.csv"), "w+t")
-        writer = csv.writer(file, delimiter=",")
+        file_path = os.path.join(path, "data", f"{file_name}.pkl")
         # Loop for n_expe repeated experiments
         for j in tqdm(range(n_expe)):
             model = models[j]
             alg = model.__getattribute__(alg_name)
-            args = inspect.getfullargspec(alg)[0][2:]
-            args = [T] + [param_dic[m][i] for i in args]
-            reward, regret = alg(*args)
-            all_regrets[j, :] = np.cumsum(regret)
-            writer.writerow(all_regrets[j, :].astype(np.float32))
+            # args = inspect.getfullargspec(alg)[0][2:]
+            # kwargs = {key: param_dic[m][key] for key in args and param_dic[m].keys()}
+            kwargs = param_dic[m]
+            return_dic = alg(T, **kwargs)
+            if len(all_dic) == 0:
+                all_dic = return_dic
+            else:
+                for key in all_dic.keys():
+                    all_dic[key] = np.vstack((all_dic[key], return_dic[key]))
+
         # Summary for one method (i, m)
-        mean_regret[i] = np.mean(all_regrets, axis=0)
-        low_CI_bound[i], high_CI_bound[i] = st.t.interval(
-            0.95, T - 1, loc=mean_regret[i], scale=st.sem(all_regrets)
+        cum_list = [
+            "expected_regret",
+            "pess_regret",
+            "est_regret",
+            "potential",
+            "approx_potential",
+        ]
+        cum_dic = {
+            key: np.cumsum(all_dic[key], axis=1)
+            for key in set(all_dic.keys()) & set(cum_list)
+        }
+
+        print(cum_dic.keys())
+
+        cum_dic = {
+            key: {
+                "mean": mean,
+                "high_CI": high_CI,
+                "low_CI": low_CI,
+            }
+            for (key, mean, (low_CI, high_CI)) in [
+                (
+                    key,
+                    mean,
+                    st.t.interval(
+                        0.95,
+                        T - 1,
+                        loc=mean,
+                        scale=st.sem(cum, nan_policy="omit") + 1e-20,
+                    ),
+                )
+                for key, mean, cum in [
+                    (key, np.mean(value, axis=0), value)
+                    for key, value in cum_dic.items()
+                ]
+            ]
+        }
+        all_dic = {
+            key: {
+                "mean": mean,
+                "low_CI": low_CI,
+                "high_CI": high_CI,
+            }
+            for (key, mean, (low_CI, high_CI)) in [
+                (
+                    key,
+                    mean,
+                    st.t.interval(
+                        0.95,
+                        T - 1,
+                        loc=mean,
+                        scale=st.sem(cum, nan_policy="omit") + 1e-20,
+                    ),
+                )
+                for key, mean, cum in [
+                    (key, np.mean(value, axis=0), value)
+                    for key, value in all_dic.items()
+                ]
+            ]
+        }
+
+        cum_regrets = cum_dic["expected_regret"]
+        mean_regret[i], low_CI_bound[i], high_CI_bound[i] = (
+            cum_regrets["mean"],
+            cum_regrets["low_CI"],
+            cum_regrets["high_CI"],
         )
-        print(f"{m}: {np.mean(all_regrets, axis=0)[-1]}")
+        print(f"{m}: {mean_regret[i][-1]}")
+
+        pkl.dump({"all": all_dic, "cum": cum_dic}, open(file_path, "wb"))
 
     results = {
         "mean_regret": mean_regret,
@@ -393,3 +489,22 @@ def set_seed(seed, use_torch=False):
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
             torch.cuda.manual_seed(seed)
+
+
+def approx_err(a, action_set, P, Q):
+    # Compute the approximation error of P. Q is the matrix to be approximated.
+    Q_inv = np.linalg.inv(Q)
+    norm_err = np.linalg.norm(Q_inv @ P, 2) - 1  # (1+ eps -1)
+    # print(np.linalg.norm(Q_inv @ P, 2))
+    norm_err = max(norm_err, 1 - np.linalg.norm(Q_inv @ P, -2))  # (1- (1-eps))
+    # print(np.linalg.norm(Q_inv @ P, -2))
+
+    xPx = np.diag(action_set @ P @ action_set.T)
+    xQx = np.diag(action_set @ Q @ action_set.T)
+    pot = xQx[a]
+    approx_pot = xPx[a]
+    set_err = (xPx - xQx) / xQx
+    err = set_err[a]
+    set_err = np.max(np.abs(set_err))
+
+    return norm_err, set_err, err, pot, approx_pot

@@ -46,6 +46,30 @@ class ArmGaussianLinear(object):
         best_arm_reward = arm_reward.max()
         return best_arm_reward - expect_reward
 
+    def pessimism_regret(self, arm, action_set, img_reward):
+        """
+        Compute the pessimism regret of a single step
+        """
+        arm_reward = np.dot(action_set, self.real_theta)
+        best_arm_reward = arm_reward.max()
+
+        # arm_reward = np.dot(action_set, img_theta)
+        # img_reward = arm_reward[arm]
+
+        return best_arm_reward - img_reward[arm]
+
+    # def estimation_regret(self, arm, action_set, img_theta):
+    #     """
+    #     Compute the estimation regret of a single step
+    #     """
+    #     arm_reward = np.dot(action_set, self.real_theta)
+    #     # best_arm_reward = arm_reward.max()
+    #     expect_reward = arm_reward[arm]
+    #     arm_reward = np.dot(action_set, img_theta)
+    #     img_reward = arm_reward[arm]
+
+    #     return img_reward - expect_reward
+
 
 class PaperLinModel(ArmGaussianLinear):
     def __init__(self, u, n_features, n_actions, eta=10, sigma=10):
@@ -114,8 +138,14 @@ class FGTSLinModel(ArmGaussianLinear):
         self.features[0, 0] = 1.0
         self.features[1, 1] = 0.2
         if n_actions > 2:
-            self.features[2:] = self.prior_random.uniform(-1, 1, (n_actions-2, n_features)) 
-            self.features[2:] = 0.2 * self.features[2:] / np.expand_dims(np.linalg.norm(self.features[2:], axis=1), axis=1)
+            self.features[2:] = self.prior_random.uniform(
+                -1, 1, (n_actions - 2, n_features)
+            )
+            self.features[2:] = (
+                0.2
+                * self.features[2:]
+                / np.expand_dims(np.linalg.norm(self.features[2:], axis=1), axis=1)
+            )
             # print(self.features)
             # print(np.linalg.norm(self.features, axis=1))
         self.features[np.where(self.features == 0)] = 1e-6

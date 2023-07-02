@@ -300,7 +300,7 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
 
     os.makedirs(os.path.join(path, "data"), exist_ok=True)
     for i, m in enumerate(methods):
-        set_seed(2022, use_torch=use_torch)
+        set_seed(2023, use_torch=use_torch)
         alg_name = m.split(":")[0]
         all_dic = {}
         file_name = m.replace(":", "_").replace(" ", "_").lower()
@@ -315,6 +315,8 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
             return_dic = alg(T, **kwargs)
             if len(all_dic) == 0:
                 all_dic = return_dic
+                for key in all_dic.keys():
+                    all_dic[key] = np.expand_dims(all_dic[key], axis=0)
             else:
                 for key in all_dic.keys():
                     all_dic[key] = np.vstack((all_dic[key], return_dic[key]))
@@ -491,20 +493,16 @@ def set_seed(seed, use_torch=False):
             torch.cuda.manual_seed(seed)
 
 
-def approx_err(a, action_set, P, Q):
+def approx_err(a, action_set, P, Q, Q_inv):
     # Compute the approximation error of P. Q is the matrix to be approximated.
-    Q_inv = np.linalg.inv(Q)
-    norm_err = np.linalg.norm(Q_inv @ P, 2) - 1  # (1+ eps -1)
-    # print(np.linalg.norm(Q_inv @ P, 2))
-    norm_err = max(norm_err, 1 - np.linalg.norm(Q_inv @ P, -2))  # (1- (1-eps))
-    # print(np.linalg.norm(Q_inv @ P, -2))
+    # Q_inv = np.linalg.inv(Q)
+    up_norm_err = np.linalg.norm(Q_inv @ P, 2) - 1  # eps_1 = (1+ eps_1 -1)
+    low_norm_err = 1 - np.linalg.norm(Q_inv @ P, -2)  # eps_2 = (1- (1-eps_2))
+    # norm_err = max(up_norm_err, low_norm_err)
 
     xPx = np.diag(action_set @ P @ action_set.T)
     xQx = np.diag(action_set @ Q @ action_set.T)
-    pot = xQx[a]
-    approx_pot = xPx[a]
-    set_err = (xPx - xQx) / xQx
-    err = set_err[a]
-    set_err = np.max(np.abs(set_err))
+    # pot = xQx[a]
+    # approx_pot = xPx[a]
 
-    return norm_err, set_err, err, pot, approx_pot
+    return up_norm_err, low_norm_err, (xPx - xQx) / xQx, xQx[a], xPx[a]

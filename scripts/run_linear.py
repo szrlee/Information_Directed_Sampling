@@ -48,7 +48,9 @@ os.makedirs(path, exist_ok=True)
 
 
 param = {
-    "TS": {},
+    "TS": {
+        "scheme": args.scheme,
+    },
     "ES": {"M": args.d_index},
     "IS:Normal_Sphere": {
         "M": args.d_index,
@@ -172,12 +174,12 @@ param = {
 methods = [
     "TS",
     # "ES",
-    # "IS:PMCoord_Gaussian",
-    # "IS:PMCoord_Sphere",
+    "IS:PMCoord_Gaussian",
+    "IS:PMCoord_Sphere",
     # "IS:PMCoord_PMCoord",
-    # "IS:PMCoord_UnifGrid",
+    "IS:PMCoord_UnifGrid",
     "IS:Normal_Sphere",
-    # "IS:Normal_Gaussian",
+    "IS:Normal_Gaussian",
     # "IS:Normal_PMCoord",
     "IS:Normal_UnifGrid",
     # "IS:UnifGrid_Sphere",

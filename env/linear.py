@@ -1,4 +1,5 @@
 import numpy as np
+from utils import rd_argmax
 
 
 class ArmGaussianLinear(object):
@@ -45,6 +46,9 @@ class ArmGaussianLinear(object):
         expect_reward = arm_reward[arm]
         best_arm_reward = arm_reward.max()
         return best_arm_reward - expect_reward
+
+    def optimal_action(self, action_set):
+        return rd_argmax(np.dot(action_set, self.real_theta))
 
     def pessimism_regret(self, arm, action_set, img_reward):
         """

@@ -21,12 +21,20 @@ class LinMAB:
         :param env: ArmGaussianLinear object
         """
         self.env = env
-        self.expect_regret, self.n_a, self.d, self.features, self.pess_regret = (
+        (
+            self.expect_regret,
+            self.n_a,
+            self.d,
+            self.features,
+            self.pess_regret,
+            self.optimal_action,
+        ) = (
             env.expect_regret,
             env.n_actions,
             env.n_features,
             env.features,
             env.pessimism_regret,
+            env.optimal_action,
         )
         self.reward, self.eta = env.reward, env.eta
         self.prior_sigma = env.alg_prior_sigma
@@ -68,7 +76,7 @@ class LinMAB:
         ffT = np.outer(f, f)
         return Sigma - (Sigma @ ffT @ Sigma) / (self.eta**2 + f @ Sigma @ f)
 
-    def updatePosterior_(self, a, sigma, p):
+    def updatePosterior_(self, sigma, p, f, r):
         """
         Update posterior mean and covariance matrix incrementally
         without matrix inversion
@@ -77,114 +85,86 @@ class LinMAB:
         :param p: np.array, sigma_inv mu
         :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
         """
-        f, r = self.features[a], self.reward(a)[0]
         sigma_ = self.rankone_update(f, sigma)
         p_ = p + ((r * f) / self.eta**2)
         mu_ = sigma_ @ p_
-        return r, mu_, sigma_, p_
+        return mu_, sigma_, p_
 
-    def TS(self, T):
+    def update_inv_sigma(self, inv_sigma, f):
+        ffT = np.outer(f, f)
+        return inv_sigma + (1 / self.eta**2) * ffT
+
+    def TS(self, T, scheme="ts"):
         """
         Implementation of Thomson Sampling (TS) algorithm for Linear Bandits with multivariate normal prior
         :param T: int, time horizon
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
-        reward, expected_regret = np.zeros(T), np.zeros(T)
-        mu_t, sigma_t = self.initPrior()
-        p_t = np.linalg.inv(sigma_t) @ mu_t
-        for t in range(T):
+
+        def posterior_sampling(mu, sigma, n_samples=1):
             try:
-                theta_t = np.random.multivariate_normal(mu_t, sigma_t, 1).T
+                theta = np.random.multivariate_normal(mu, sigma, n_samples).T
             except:
                 try:
-                    # print(np.isnan(sigma_t).any(), np.isinf(sigma_t).any())
-                    z = np.random.normal(0, 1, self.d)
-                    theta_t = sqrtm(sigma_t) @ z + mu_t
+                    z = np.random.normal(0, 1, size=(self.d, n_samples))
+                    theta = sqrtm(sigma) @ z + np.expand_dims(mu, axis=1)
                 except:
-                    print(np.isnan(sigma_t).any(), np.isinf(sigma_t).any())
+                    print(np.isnan(sigma).any(), np.isinf(sigma).any())
+            return theta
 
-            a_t = rd_argmax(np.dot(self.features, theta_t))
-            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
-            # r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
+        # initialization for synthesis
+        reward, expected_regret = np.zeros(T), np.zeros(T)
+        pess_regret, est_regret = np.zeros(T), np.zeros(T)
+        lmax, lmin = np.zeros(T), np.zeros(T)
+        pot = np.zeros(T)
+        # TODO: add condition number, lambda_max, lambda_min of inv_Sigma matrix!
+        lmax_inv, lmin_inv, kappa_inv = np.zeros(T), np.zeros(T), np.zeros(T)
+        # Algorithm
+        mu_t, sigma_t = self.initPrior()
+        inv_sigma_t = np.linalg.inv(sigma_t)
+        p_t = inv_sigma_t @ mu_t
+        for t in range(T):
+            # scheme for img_reward
+            if scheme == "ts":
+                theta_t = posterior_sampling(mu_t, sigma_t)
+                img_reward = np.dot(self.features, theta_t)
+            elif scheme == "ots":
+                theta_t = posterior_sampling(mu_t, sigma_t, 10)
+                img_reward = np.max(np.dot(self.features, theta_t), axis=1)
+            # action selection
+            a_t = rd_argmax(img_reward)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
 
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+            # Synthesis: lmax, lmin, pess_regret, est_regret, potential: pot; lmax_inv, lmin_inv, kappa_inv
+            pot[t] = f_t.T @ sigma_t @ f_t
+            lmax[t] = np.linalg.norm(sigma_t, 2)
+            lmin[t] = np.linalg.norm(sigma_t, -2)
+            lmax_inv[t] = np.linalg.norm(inv_sigma_t, 2)
+            lmin_inv[t] = np.linalg.norm(inv_sigma_t, -2)
+            kappa_inv[t] = np.linalg.cond(inv_sigma_t)
+
+            pess_regret[t] = self.pess_regret(a_t, self.features, img_reward)
+            est_regret[t] = expected_regret[t] - pess_regret[t]
+
+            # Update posterior
+            mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t)
+            inv_sigma_t = self.update_inv_sigma(inv_sigma_t, f_t)
 
         dic = {
             "reward": reward,
             "expected_regret": expected_regret,
+            "pess_regret": pess_regret,
+            "est_regret": est_regret,
+            "potential": pot,
+            "lmax": lmax,
+            "lmin": lmin,
+            "lmax_inv": lmax_inv,
+            "lmin_inv": lmin_inv,
+            "kappa_inv": kappa_inv,
         }
+
         return dic
-
-    def ES(self, T, M=10):
-        """
-        Ensemble sampling
-        """
-        reward, expected_regret = np.zeros(T), np.zeros(T)
-        mu_t, Sigma_t = self.initPrior()
-        # A_t = np.zeros((self.d, M))
-        # P_t = np.zeros((self.d, M))
-        B = np.random.normal(0, 1, (self.d, M))
-        # print(B.shape, np.linalg.norm(B, axis=1))
-        A_t = mu_t.reshape((self.d, 1)) + sqrtm(Sigma_t) @ B
-        P_t = np.linalg.inv(Sigma_t) @ A_t
-        for t in range(T):
-            i = np.random.choice(M, 1)[0]
-            theta_t = A_t[:, [i]]
-            a_t = rd_argmax(np.dot(self.features, theta_t))
-            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            Sigma_t = self.rankone_update(f_t, Sigma_t)
-            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            # Update M models with algorithmic random perturbation
-            P_t += np.outer(
-                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta**2
-            )
-            A_t = Sigma_t @ P_t
-
-        return reward, expected_regret
-
-    def ES_pm(self, T, M=10):
-        """
-        Ensemble sampling with positive and negative index
-        """
-        reward, expected_regret = np.zeros(T), np.zeros(T)
-        mu_t, Sigma_t = self.initPrior()
-        # A_t = np.zeros((self.d, M))
-        # P_t = np.zeros((self.d, M))
-        B = np.random.normal(0, 1, (self.d, M))
-        # print(B.shape, np.linalg.norm(B, axis=1))
-        A_t = mu_t.reshape((self.d, 1)) + sqrtm(Sigma_t) @ B
-        P_t = np.linalg.inv(Sigma_t) @ A_t
-        for t in range(T):
-            i = np.random.choice(M, 1)[0]
-            theta_t = A_t[:, [i]]
-            a_t = rd_argmax(np.dot(self.features, theta_t))
-            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
-            Sigma_t = self.rankone_update(f_t, Sigma_t)
-            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
-            # Update M models with algorithmic random perturbation
-            P_t += np.outer(
-                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta**2
-            )
-            A_t = Sigma_t @ P_t
-
-        return reward, expected_regret
-
-    # def sphere_rand_gen(self, M, N=1, haar=False):
-    #     """
-    #     Random vector generation
-    #     """
-    #     assert N > 0
-    #     if not haar:
-    #         return sphere_matrix(N, M)
-    #     # generate vectors from Haar random matrix
-    #     if N == 1:
-    #         if self.counter == 0:
-    #             self.V = haar_matrix(M)
-    #         v = self.V[:, self.counter]
-    #         self.counter = (self.counter + 1) % M
-    #         return v
-    #     else:
-    #         return multi_haar_matrix(N, M)
 
     def IS(
         self,
@@ -204,15 +184,35 @@ class LinMAB:
 
         # initialization for synthesis
         reward, expected_regret = np.zeros(T), np.zeros(T)
-        norm_err, set_err, a_t_err = np.zeros(T), np.zeros(T), np.zeros(T)
-        tilde_norm_err, tilde_set_err, tilde_a_t_err = (
+        pess_regret, est_regret = np.zeros(T), np.zeros(T)
+        lmax, lmin = np.zeros(T), np.zeros(T)
+        lmax_inv, lmin_inv, kappa_inv = np.zeros(T), np.zeros(T), np.zeros(T)
+
+        pot, approx_pot = np.zeros(T), np.zeros(T)
+        # synthesis quantity only for index sampling
+        (up_norm_err, low_norm_err, up_set_err, low_set_err, a_t_err, a_star_err) = (
+            np.zeros(T),
+            np.zeros(T),
+            np.zeros(T),
             np.zeros(T),
             np.zeros(T),
             np.zeros(T),
         )
-        pess_regret, est_regret = np.zeros(T), np.zeros(T)
-        lmax, lmin = np.zeros(T), np.zeros(T)
-        pot, approx_pot = np.zeros(T), np.zeros(T)
+        (
+            tilde_up_norm_err,
+            tilde_low_norm_err,
+            tilde_up_set_err,
+            tilde_low_set_err,
+            tilde_a_t_err,
+            tilde_a_star_err,
+        ) = (
+            np.zeros(T),
+            np.zeros(T),
+            np.zeros(T),
+            np.zeros(T),
+            np.zeros(T),
+            np.zeros(T),
+        )
 
         def index_sampling(A, mu, index, scheme="ts"):
             M = A.shape[1]
@@ -253,22 +253,44 @@ class LinMAB:
             # compute regret
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
 
-            # Synthesis
-            norm_err[t], set_err[t], a_t_err[t], pot[t], approx_pot[t] = approx_err(
-                a_t, self.features, A_t @ A_t.T, Sigma_t
-            )
-            tilde_norm_err[t], tilde_set_err[t], tilde_a_t_err[t], _, _ = approx_err(
-                a_t, self.features, tilde_A_t @ tilde_A_t.T, Sigma_t
-            )
+            # Synthesis only for index sampling
+            a_star = self.optimal_action(self.features)
+            (
+                up_norm_err[t],
+                low_norm_err[t],
+                all_err,
+                pot[t],
+                approx_pot[t],
+            ) = approx_err(a_t, self.features, A_t @ A_t.T, Sigma_t, S_inv)
+            a_t_err[t] = all_err[a_t]
+            a_star_err[t] = all_err[a_star]
+            up_set_err[t] = np.max((all_err))
+            low_set_err[t] = np.max(-(all_err))
+            (
+                tilde_up_norm_err[t],
+                tilde_low_norm_err[t],
+                tilde_all_err,
+                _,
+                _,
+            ) = approx_err(a_t, self.features, tilde_A_t @ tilde_A_t.T, Sigma_t, S_inv)
+            tilde_a_t_err[t] = tilde_all_err[a_t]
+            tilde_a_star_err[t] = tilde_all_err[a_star]
+            tilde_up_set_err[t] = np.max((tilde_all_err))
+            tilde_low_set_err[t] = np.max(-(tilde_all_err))
+
+            # Synthesis: lmax, lmin, pess_regret, est_regret, potential: pot, approx_potential: approx_pot
             lmax[t] = np.linalg.norm(Sigma_t, 2)
             lmin[t] = np.linalg.norm(Sigma_t, -2)
-            # pess_regret, est_regret, potential: pot, approx_potential: approx_pot
+            lmax_inv[t] = np.linalg.norm(S_inv, 2)
+            lmin_inv[t] = np.linalg.norm(S_inv, -2)
+            kappa_inv[t] = np.linalg.cond(S_inv)
             pess_regret[t] = self.pess_regret(a_t, self.features, img_reward)
             est_regret[t] = expected_regret[t] - pess_regret[t]
 
             # incremental update on Sigma and mu
             # Sigma_t = self.rankone_update(f_t, Sigma_t)
-            r_t, mu_t, Sigma_t, p_t = self.updatePosterior_(a_t, Sigma_t, p_t)
+            mu_t, Sigma_t, p_t = self.updatePosterior_(Sigma_t, p_t, f_t, r_t)
+            S_inv = self.update_inv_sigma(S_inv, f_t)
 
             # Update covariance factor A
             b_t = sample_noise(perturbed_noise, M)[0]
@@ -287,17 +309,54 @@ class LinMAB:
             "est_regret": est_regret,
             "potential": pot,
             "approx_potential": approx_pot,
-            #
-            "norm_err": norm_err,
-            "set_err": set_err,
-            "a_t_err": a_t_err,
-            "tilde_norm_err": tilde_norm_err,
-            "tilde_set_err": tilde_set_err,
-            "tilde_a_t_err": tilde_a_t_err,
             "lmax": lmax,
             "lmin": lmin,
+            "lmax_inv": lmax_inv,
+            "lmin_inv": lmin_inv,
+            "kappa_inv": kappa_inv,
+            #
+            "up_norm_err": up_norm_err,
+            "low_norm_err": low_norm_err,
+            "up_set_err": up_set_err,
+            "low_set_err": low_set_err,
+            "a_t_err": a_t_err,
+            "a_star_err": a_star_err,
+            # tilde for independent z
+            "tilde_up_norm_err": tilde_up_norm_err,
+            "tilde_low_norm_err": tilde_low_norm_err,
+            "tilde_up_set_err": tilde_up_set_err,
+            "tilde_low_set_err": tilde_low_set_err,
+            "tilde_a_t_err": tilde_a_t_err,
+            "tilde_a_star_err": tilde_a_star_err,
         }
         return dic
+
+    def ES(self, T, M=10):
+        """
+        Ensemble sampling
+        """
+        reward, expected_regret = np.zeros(T), np.zeros(T)
+        mu_t, Sigma_t = self.initPrior()
+        # A_t = np.zeros((self.d, M))
+        # P_t = np.zeros((self.d, M))
+        B = np.random.normal(0, 1, (self.d, M))
+        # print(B.shape, np.linalg.norm(B, axis=1))
+        A_t = mu_t.reshape((self.d, 1)) + sqrtm(Sigma_t) @ B
+        P_t = np.linalg.inv(Sigma_t) @ A_t
+        for t in range(T):
+            i = np.random.choice(M, 1)[0]
+            theta_t = A_t[:, [i]]
+            a_t = rd_argmax(np.dot(self.features, theta_t))
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            Sigma_t = self.rankone_update(f_t, Sigma_t)
+            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+            # Update M models with algorithmic random perturbation
+            P_t += np.outer(
+                f_t, (r_t + np.random.normal(0, self.eta, M)) / self.eta**2
+            )
+            A_t = Sigma_t @ P_t
+
+        return reward, expected_regret
 
     def LinUCB(self, T, lbda=10e-4, alpha=10e-1):
         """

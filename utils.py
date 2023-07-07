@@ -10,6 +10,8 @@ from scipy.linalg import sqrtm
 from tqdm import tqdm
 import inspect
 import pickle as pkl
+import time
+
 
 cmap = {
     0: "black",
@@ -499,9 +501,14 @@ def approx_err(a, action_set, P, Q, Q_inv):
     up_norm_err = np.linalg.norm(Q_inv @ P, 2) - 1  # eps_1 = (1+ eps_1 -1)
     low_norm_err = 1 - np.linalg.norm(Q_inv @ P, -2)  # eps_2 = (1- (1-eps_2))
     # norm_err = max(up_norm_err, low_norm_err)
-
-    xPx = np.diag(action_set @ P @ action_set.T)
-    xQx = np.diag(action_set @ Q @ action_set.T)
+    # t = time.time()
+    xPx = np.einsum("ij,jk,ki->i", action_set, P, action_set.T)
+    # print(np.round_(time.time() - t, 3), "sec elapsed")
+    # t = time.time()
+    # xPxt = np.diag(action_set @ P @ action_set.T)
+    # print(np.round_(time.time() - t, 3), "sec elapsed")
+    # print(np.allclose(xPx, xPxt))
+    xQx = np.einsum("ij,jk,ki->i", action_set, Q, action_set.T)
     # pot = xQx[a]
     # approx_pot = xPx[a]
 

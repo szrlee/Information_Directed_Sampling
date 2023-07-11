@@ -175,7 +175,7 @@ def plotall(ax, dict, set_y_label, title, k, syn="expected_regret", is_cum=False
         ax.legend(loc="lower right")
 
 
-# %%
+# %% print cumulative quantity
 tag = 0
 for title in cum_quantities.keys():
     tag += 1
@@ -252,13 +252,13 @@ for title in cum_quantities.keys():
         # plotall(axes[2][1], all_regs, mean_reg, False, title, "IS:Sphere_PM")
         # plotall(axes[2][2], all_regs, mean_reg, False, title, "IS:Sphere_Sphere")
 
-        plt.savefig(f"{load_path}/png/{time_tag}_{game_name}_{tag}_{syn}.png")
-        print(f"save to {load_path}/png/{time_tag}_{game_name}_{tag}_cum_{syn}")
-        plt.savefig(f"{load_path}/pdf/{time_tag}_{game_name}_{tag}_{syn}.pdf")
-        print(f"save to {load_path}/pdf/{time_tag}_{game_name}_{tag}_cum_{syn}")
+        plt.savefig(f"{load_path}/png/{time_tag}_{game_name}_{tag}_cum_{syn}.png")
+        print(f"save to {load_path}/png/{time_tag}_{game_name}_{tag}_cum_{syn}.png")
+        plt.savefig(f"{load_path}/pdf/{time_tag}_{game_name}_{tag}_cum_{syn}.pdf")
+        print(f"save to {load_path}/pdf/{time_tag}_{game_name}_{tag}_cum_{syn}.pdf")
         plt.close()
 
-# %%
+# %% print immediate quantity
 tag = 0
 for title in all_quantities.keys():
     tag += 1
@@ -337,7 +337,8 @@ for title in all_quantities.keys():
         # plotall(axes[2][2], all_regs, mean_reg, False, title, "IS:Sphere_Sphere")
 
         plt.savefig(f"{load_path}/png/{time_tag}_{game_name}_{tag}_{syn}.png")
-        print(f"save to {load_path}/png/{time_tag}_{game_name}_{tag}_cum_{syn}")
+        print(f"save to {load_path}/png/{time_tag}_{game_name}_{tag}_{syn}.png")
         plt.savefig(f"{load_path}/pdf/{time_tag}_{game_name}_{tag}_{syn}.pdf")
-        print(f"save to {load_path}/pdf/{time_tag}_{game_name}_{tag}_cum_{syn}")
+        print(f"save to {load_path}/pdf/{time_tag}_{game_name}_{tag}_{syn}.pdf")
+        plt.close()
 # %%

@@ -259,6 +259,7 @@ for title in cum_quantities.keys():
         print(
             f"save to {path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_cum_{syn}"
         )
+        plt.close()
 
 # %%
 tag = 0
@@ -339,10 +340,10 @@ for title in all_quantities.keys():
         # plotall(axes[2][2], all_regs, mean_reg, False, title, "IS:Sphere_Sphere")
 
         plt.savefig(
-            f"{path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_{syn}"
+            f"{path}/results/bandit/{game_name}/{time_tag}/png/{time_tag}_{game_name}_{tag}_{syn}"
         )
         plt.savefig(
-            f"{path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_{syn}.pdf"
+            f"{path}/results/bandit/{game_name}/{time_tag}/pdf/{time_tag}_{game_name}_{tag}_{syn}.pdf"
         )
         print(
             f"save to {path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_{syn}"

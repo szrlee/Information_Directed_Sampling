@@ -63,6 +63,8 @@ load_path = f"{path}/results/bandit/{game_name}/{time_tag}"
 
 # %%
 load_path
+os.makedirs("{load_path}/png", exist_ok=True)
+os.makedirs("{load_path}/pdf", exist_ok=True)
 
 # %%
 cum_quantities = {}
@@ -250,15 +252,10 @@ for title in cum_quantities.keys():
         # plotall(axes[2][1], all_regs, mean_reg, False, title, "IS:Sphere_PM")
         # plotall(axes[2][2], all_regs, mean_reg, False, title, "IS:Sphere_Sphere")
 
-        plt.savefig(
-            f"{path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_cum_{syn}"
-        )
-        plt.savefig(
-            f"{path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_cum_{syn}.pdf"
-        )
-        print(
-            f"save to {path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_cum_{syn}"
-        )
+        plt.savefig(f"{load_path}/png/{time_tag}_{game_name}_{tag}_{syn}.png")
+        print(f"save to {load_path}/png/{time_tag}_{game_name}_{tag}_cum_{syn}")
+        plt.savefig(f"{load_path}/pdf/{time_tag}_{game_name}_{tag}_{syn}.pdf")
+        print(f"save to {load_path}/pdf/{time_tag}_{game_name}_{tag}_cum_{syn}")
         plt.close()
 
 # %%
@@ -339,14 +336,8 @@ for title in all_quantities.keys():
         # plotall(axes[2][1], all_regs, mean_reg, False, title, "IS:Sphere_PM")
         # plotall(axes[2][2], all_regs, mean_reg, False, title, "IS:Sphere_Sphere")
 
-        plt.savefig(
-            f"{path}/results/bandit/{game_name}/{time_tag}/png/{time_tag}_{game_name}_{tag}_{syn}"
-        )
-        plt.savefig(
-            f"{path}/results/bandit/{game_name}/{time_tag}/pdf/{time_tag}_{game_name}_{tag}_{syn}.pdf"
-        )
-        print(
-            f"save to {path}/results/bandit/{game_name}/{time_tag}/{time_tag}_{game_name}_{tag}_{syn}"
-        )
-
+        plt.savefig(f"{load_path}/png/{time_tag}_{game_name}_{tag}_{syn}.png")
+        print(f"save to {load_path}/png/{time_tag}_{game_name}_{tag}_cum_{syn}")
+        plt.savefig(f"{load_path}/pdf/{time_tag}_{game_name}_{tag}_{syn}.pdf")
+        print(f"save to {load_path}/pdf/{time_tag}_{game_name}_{tag}_cum_{syn}")
 # %%

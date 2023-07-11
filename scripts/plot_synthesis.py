@@ -63,8 +63,8 @@ load_path = f"{path}/results/bandit/{game_name}/{time_tag}"
 
 # %%
 load_path
-os.makedirs("{load_path}/png", exist_ok=True)
-os.makedirs("{load_path}/pdf", exist_ok=True)
+os.makedirs(f"{load_path}/png", exist_ok=True)
+os.makedirs(f"{load_path}/pdf", exist_ok=True)
 
 # %%
 cum_quantities = {}

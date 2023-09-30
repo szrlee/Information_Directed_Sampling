@@ -56,7 +56,7 @@ path
 game_name = "Russo"
 
 # %%
-time_tag = "20230702"
+time_tag = "20230816"
 
 # %%
 load_path = f"{path}/results/bandit/{game_name}/{time_tag}"

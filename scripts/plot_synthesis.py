@@ -186,7 +186,7 @@ for title in cum_quantities.keys():
         "approx_potential",
         "potential",
     ]:
-        n_row, n_col = 2, 3
+        n_row, n_col = 4, 4
         fig, axes = plt.subplots(
             n_row, n_col, figsize=(10 * n_col, 12 * n_row + 0.6)
         )  # 3.6
@@ -222,6 +222,15 @@ for title in cum_quantities.keys():
             True,
         )
         plotall(
+            axes[0][3],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:Normal_PMCoord",
+            syn,
+            True,
+        )
+        plotall(
             axes[1][0],
             cum_quantities[title],
             True,
@@ -245,6 +254,87 @@ for title in cum_quantities.keys():
             False,
             title,
             "IS:PMCoord_UnifGrid",
+            syn,
+            True,
+        )
+        plotall(
+            axes[1][3],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:PMCoord_PMCoord",
+            syn,
+            True,
+        )
+        plotall(
+            axes[2][0],
+            cum_quantities[title],
+            True,
+            title,
+            "IS:Sphere_Sphere",
+            syn,
+            True,
+        )
+        plotall(
+            axes[2][1],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:Sphere_Gaussian",
+            syn,
+            True,
+        )
+        plotall(
+            axes[2][2],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:Sphere_UnifGrid",
+            syn,
+            True,
+        )
+        plotall(
+            axes[2][3],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:Sphere_PMCoord",
+            syn,
+            True,
+        )
+        plotall(
+            axes[3][0],
+            cum_quantities[title],
+            True,
+            title,
+            "IS:UnifGrid_Sphere",
+            syn,
+            True,
+        )
+        plotall(
+            axes[3][1],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:UnifGrid_Gaussian",
+            syn,
+            True,
+        )
+        plotall(
+            axes[3][2],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:UnifGrid_UnifGrid",
+            syn,
+            True,
+        )
+        plotall(
+            axes[3][3],
+            cum_quantities[title],
+            False,
+            title,
+            "IS:UnifGrid_PMCoord",
             syn,
             True,
         )
@@ -288,7 +378,7 @@ for title in all_quantities.keys():
         "a_star_err",
         "tilde_a_star_err",
     ]:
-        n_row, n_col = 2, 3
+        n_row, n_col = 4, 4
         fig, axes = plt.subplots(
             n_row, n_col, figsize=(10 * n_col, 12 * n_row + 0.6)
         )  # 3.6
@@ -314,6 +404,14 @@ for title in all_quantities.keys():
             syn,
         )
         plotall(
+            axes[0][3],
+            all_quantities[title],
+            False,
+            title,
+            "IS:Normal_PMCoord",
+            syn,
+        )
+        plotall(
             axes[1][0], all_quantities[title], True, title, "IS:PMCoord_Sphere", syn
         )
         plotall(
@@ -330,6 +428,66 @@ for title in all_quantities.keys():
             False,
             title,
             "IS:PMCoord_UnifGrid",
+            syn,
+        )
+        plotall(
+            axes[1][3],
+            all_quantities[title],
+            False,
+            title,
+            "IS:PMCoord_PMCoord",
+            syn,
+        )
+        plotall(axes[2][0], all_quantities[title], True, title, "IS:Sphere_Sphere", syn)
+        plotall(
+            axes[2][1],
+            all_quantities[title],
+            False,
+            title,
+            "IS:Sphere_Gaussian",
+            syn,
+        )
+        plotall(
+            axes[2][2],
+            all_quantities[title],
+            False,
+            title,
+            "IS:Sphere_UnifGrid",
+            syn,
+        )
+        plotall(
+            axes[2][3],
+            all_quantities[title],
+            False,
+            title,
+            "IS:Sphere_PMCoord",
+            syn,
+        )
+        plotall(
+            axes[3][0], all_quantities[title], True, title, "IS:UnifGrid_Sphere", syn
+        )
+        plotall(
+            axes[3][1],
+            all_quantities[title],
+            False,
+            title,
+            "IS:UnifGrid_Gaussian",
+            syn,
+        )
+        plotall(
+            axes[3][2],
+            all_quantities[title],
+            False,
+            title,
+            "IS:UnifGrid_UnifGrid",
+            syn,
+        )
+        plotall(
+            axes[3][3],
+            all_quantities[title],
+            False,
+            title,
+            "IS:UnifGrid_PMCoord",
             syn,
         )
         # plotall(axes[2][0], all_regs, mean_reg, True, title, "IS:Sphere_Gaussian")

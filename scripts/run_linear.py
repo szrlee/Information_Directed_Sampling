@@ -51,119 +51,7 @@ param = {
     "TS": {
         "scheme": args.scheme,
     },
-    "ES": {"M": args.d_index},
-    "IS:Normal_Sphere": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "gaussian",
-        "perturbed_noise": "sphere",
-        "scheme": args.scheme,
-    },
-    "IS:Normal_Gaussian": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "gaussian",
-        "perturbed_noise": "gaussian",
-        "scheme": args.scheme,
-    },
-    "IS:Normal_PMCoord": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "gaussian",
-        "perturbed_noise": "pm_coordinate",
-        "scheme": args.scheme,
-    },
-    "IS:Normal_UnifGrid": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "gaussian",
-        "perturbed_noise": "unif_grid",
-        "scheme": args.scheme,
-    },
-    "IS:PMCoord_Gaussian": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "pm_coordinate",
-        "perturbed_noise": "gaussian",
-        "scheme": args.scheme,
-    },
-    "IS:PMCoord_Sphere": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "pm_coordinate",
-        "perturbed_noise": "sphere",
-        "scheme": args.scheme,
-    },
-    "IS:PMCoord_PMCoord": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "pm_coordinate",
-        "perturbed_noise": "pm_coordinate",
-        "scheme": args.scheme,
-    },
-    "IS:PMCoord_UnifGrid": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "pm_coordinate",
-        "perturbed_noise": "unif_grid",
-        "scheme": args.scheme,
-    },
-    "IS:Sphere_Gaussian": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "sphere",
-        "perturbed_noise": "gaussian",
-        "scheme": args.scheme,
-    },
-    "IS:Sphere_Sphere": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "sphere",
-        "perturbed_noise": "sphere",
-        "scheme": args.scheme,
-    },
-    "IS:Sphere_PMCoord": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "sphere",
-        "perturbed_noise": "pm_coordinate",
-        "scheme": args.scheme,
-    },
-    "IS:Sphere_UnifGrid": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "sphere",
-        "perturbed_noise": "unif_grid",
-        "scheme": args.scheme,
-    },
-    "IS:UnifGrid_Gaussian": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "unif_grid",
-        "perturbed_noise": "gaussian",
-        "scheme": args.scheme,
-    },
-    "IS:UnifGrid_Sphere": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "unif_grid",
-        "perturbed_noise": "sphere",
-        "scheme": args.scheme,
-    },
-    "IS:UnifGrid_PMCoord": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "unif_grid",
-        "perturbed_noise": "pm_coordinate",
-        "scheme": args.scheme,
-    },
-    "IS:UnifGrid_UnifGrid": {
-        "M": args.d_index,
-        "haar": False,
-        "index": "unif_grid",
-        "perturbed_noise": "unif_grid",
-        "scheme": args.scheme,
-    },
+    # "ES": {"M": args.d_index},
     # "LinUCB": {"lbda": 10e-4, "alpha": 10e-1},
     # "BayesUCB": {},
     # "GPUCB": {},
@@ -171,25 +59,62 @@ param = {
     # "VIDS_sample": {"M": 10000},
 }
 
+# done
+index_done = []
+noise_done = []
+
+# index_done = [
+#     "Normal",
+#     "PMCoord",
+#     "Sphere",
+#     "UnifCube",
+# ]
+
+# noise_done = [
+#     "Gaussian",
+#     "Sphere",
+#     "PMCoord",
+#     "UnifCube",
+# ]
+
+# all
+
+index_candidates = [
+    "Normal",
+    "Sparse",
+    "SparseConsistent",
+    "PMCoord",
+    "Sphere",
+    "UnifCube",
+]
+
+noise_candidates = [
+    "Gaussian",
+    "Sphere",
+    "PMCoord",
+    "UnifCube",
+    "Sparse",
+    "SparseConsistent",
+]
+
+index_noise_candidates = []
+
+for index in index_candidates:
+    for noise in noise_candidates:
+        if index in index_done and noise in noise_done:
+            continue
+        param["IS:{}_{}".format(index, noise)] = {
+            "M": args.d_index,
+            "haar": False,
+            "index": index,
+            "perturbed_noise": noise,
+            "scheme": args.scheme,
+        }
+        index_noise_candidates.append("IS:{}_{}".format(index, noise))
+
 methods = [
     "TS",
     ## "ES",
-    "IS:PMCoord_Gaussian",
-    "IS:PMCoord_Sphere",
-    "IS:PMCoord_PMCoord",
-    "IS:PMCoord_UnifGrid",
-    "IS:Normal_Sphere",
-    "IS:Normal_Gaussian",
-    "IS:Normal_PMCoord",
-    "IS:Normal_UnifGrid",
-    "IS:UnifGrid_Sphere",
-    "IS:UnifGrid_Gaussian",
-    "IS:UnifGrid_PMCoord",
-    "IS:UnifGrid_UnifGrid",
-    "IS:Sphere_Sphere",
-    "IS:Sphere_Gaussian",
-    "IS:Sphere_PMCoord",
-    "IS:Sphere_UnifGrid",
     # "IS:Haar",
     # "LinUCB",
     # "BayesUCB",
@@ -197,6 +122,8 @@ methods = [
     # "Tuned_GPUCB",
     # "VIDS_sample",
 ]
+
+methods.extend(index_noise_candidates)
 
 game_config = {
     "FreqRusso": {

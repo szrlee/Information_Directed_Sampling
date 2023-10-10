@@ -83,22 +83,22 @@ mapping_methods_colors = {
     "ES": "green",
     "ES:G": "green",
     "ES:E": "green",
-    "IS:Normal_Sphere": "red",
-    "IS:Normal_Gaussian": "blue",
-    "IS:Normal_PMCoord": "green",
-    "IS:Normal_UnifGrid": "brown",
-    "IS:Sphere_Sphere": "red",
-    "IS:Sphere_Gaussian": "blue",
-    "IS:Sphere_PMCoord": "green",
-    "IS:Sphere_UnifGrid": "brown",
-    "IS:PMCoord_Gaussian": "red",
-    "IS:PMCoord_Sphere": "blue",
-    "IS:PMCoord_PMCoord": "green",
-    "IS:PMCoord_UnifGrid": "brown",
-    "IS:UnifGrid_Gaussian": "red",
-    "IS:UnifGrid_Sphere": "blue",
-    "IS:UnifGrid_PMCoord": "green",
-    "IS:UnifGrid_UnifGrid": "brown",
+    # "IS:Normal_Sphere": "red",
+    # "IS:Normal_Gaussian": "blue",
+    # "IS:Normal_PMCoord": "green",
+    # "IS:Normal_UnifGrid": "brown",
+    # "IS:Sphere_Sphere": "red",
+    # "IS:Sphere_Gaussian": "blue",
+    # "IS:Sphere_PMCoord": "green",
+    # "IS:Sphere_UnifGrid": "brown",
+    # "IS:PMCoord_Gaussian": "red",
+    # "IS:PMCoord_Sphere": "blue",
+    # "IS:PMCoord_PMCoord": "green",
+    # "IS:PMCoord_UnifGrid": "brown",
+    # "IS:UnifGrid_Gaussian": "red",
+    # "IS:UnifGrid_Sphere": "blue",
+    # "IS:UnifGrid_PMCoord": "green",
+    # "IS:UnifGrid_UnifGrid": "brown",
     "IS:Sphere": "red",
     "IS:Haar": "blue",
     "TS_hyper": "green",
@@ -191,23 +191,38 @@ def sphere_matrix(N, M):
     return v
 
 
-def sample_noise(
-    noise_type,
-    M,
-    dim=1,
-):
+def random_choice_noreplace(m, n, axis=-1):
+    # m, n are the number of rows, cols of output
+    return np.random.rand(m, n).argsort(axis=axis)
+
+
+def sample_noise(noise_type, M, dim=1, sparsity=2):
     # ensure the sampled vector is isotropic
     assert M > 0
-    if noise_type == "sphere":
+    if noise_type == "Sphere":
         return sphere_matrix(dim, M)
-    elif noise_type == "gaussian":
+    elif noise_type == "Gaussian" or noise_type == "Normal":
         return np.random.normal(0, 1, (dim, M)) / np.sqrt(M)
-    elif noise_type == "pm_coordinate":
+    elif noise_type == "PMCoord":
         i = np.random.choice(M, dim)
         B = np.zeros((dim, M))
         B[np.arange(dim), i] = random_sign(dim)
         return B
-    elif noise_type == "unif_grid":
+    elif noise_type == "Sparse":
+        i = random_choice_noreplace(dim, M)[:, :sparsity]
+        B = np.zeros((dim, M))
+        B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(
+            dim * sparsity
+        ).reshape(dim, sparsity) / np.sqrt(sparsity)
+        return B
+    elif noise_type == "SparseConsistent":
+        i = random_choice_noreplace(dim, M)[:, :sparsity]
+        B = np.zeros((dim, M))
+        B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(dim).reshape(
+            dim, 1
+        ) / np.sqrt(sparsity)
+        return B
+    elif noise_type == "UnifCube":
         return (2 * np.random.binomial(1, 0.5, (dim, M)) - 1) / np.sqrt(M)
     else:
         raise NotImplementedError
@@ -477,7 +492,7 @@ def build_bernoulli_finite_set(L, K):
 
 def random_sign(N=None):
     if (N is None) or (N == 1):
-        return 1 if rd.random() < 0.5 else -1
+        return np.random.randint(0, 2, 1) * 2 - 1
     elif N > 1:
         return np.random.randint(0, 2, N) * 2 - 1
 

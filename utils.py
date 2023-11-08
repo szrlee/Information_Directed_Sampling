@@ -13,6 +13,7 @@ import inspect
 import pickle as pkl
 import time
 
+rng = None
 
 cmap = {
     0: "black",
@@ -211,7 +212,8 @@ def haar_matrix(M):
     """
     Haar random matrix generation
     """
-    z = np.random.randn(M, M, dtype=np.float32)
+    # z = np.random.randn(M, M)
+    z = rng.standard_normal((M, M), dtype=np.float32)
     q, r = np.linalg.qr(z)
     d = np.diag(r)
     ph = d / np.abs(d)
@@ -220,7 +222,8 @@ def haar_matrix(M):
 
 # @nb.njit
 def sphere_matrix(N, M):
-    v = np.random.randn(N, M, dtype=np.float32)
+    # v = np.random.randn(N, M)
+    v = rng.standard_normal((N, M), dtype=np.float32)
     v /= np.linalg.norm(v, axis=1, keepdims=True)
     return v
 
@@ -235,15 +238,15 @@ def sphere_matrix(N, M):
 # @nb.njit
 def random_choice_noreplace(m, n, axis=-1):
     # m, n are the number of rows, cols of output
-    return np.random.rand(m, n).argsort(axis=axis)
+    return rng.random((m, n)).argsort(axis=axis)
 
 
 # @nb.njit
 def random_sign(N=None):
     if (N is None) or (N == 1):
-        return np.random.randint(0, 2, 1) * 2 - 1
+        return rng.integers(2, size=1) * 2 - 1
     elif N > 1:
-        return np.random.randint(0, 2, N) * 2 - 1
+        return rng.integers(2, size=N) * 2 - 1
 
 
 def sample_noise(noise_type, M, dim=1, sparsity=2):
@@ -252,28 +255,30 @@ def sample_noise(noise_type, M, dim=1, sparsity=2):
     if noise_type == "Sphere":
         return sphere_matrix(dim, M)
     elif noise_type == "Gaussian" or noise_type == "Normal":
-        return np.random.normal(0, 1, (dim, M)) / np.sqrt(M)
+        return rng.standard_normal((dim, M), dtype=np.float32) / np.sqrt(M)
     elif noise_type == "PMCoord":
-        i = np.random.choice(M, dim)
-        B = np.zeros((dim, M))
+        i = rng.choice(M, dim)
+        B = np.zeros((dim, M), dtype=np.float32)
         B[np.arange(dim), i] = random_sign(dim)
         return B
     elif noise_type == "Sparse":
         i = random_choice_noreplace(dim, M)[:, :sparsity]
-        B = np.zeros((dim, M))
+        B = np.zeros((dim, M), dtype=np.float32)
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(
             dim * sparsity
         ).reshape(dim, sparsity) / np.sqrt(sparsity)
         return B
     elif noise_type == "SparseConsistent":
         i = random_choice_noreplace(dim, M)[:, :sparsity]
-        B = np.zeros((dim, M))
+        B = np.zeros((dim, M), dtype=np.float32)
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(dim).reshape(
             dim, 1
         ) / np.sqrt(sparsity)
         return B
     elif noise_type == "UnifCube":
-        return (2 * np.random.binomial(1, 0.5, (dim, M)) - 1) / np.sqrt(M)
+        return (
+            2 * rng.binomial(1, 0.5, (dim, M)).astype(dtype=np.float32) - 1
+        ) / np.sqrt(M)
     else:
         raise NotImplementedError
 
@@ -543,6 +548,8 @@ def build_bernoulli_finite_set(L, K):
 def set_seed(seed, use_torch=False):
     np.random.seed(seed)
     rd.seed(seed)
+    global rng
+    rng = np.random.default_rng(seed)
     if use_torch:
         import torch
 

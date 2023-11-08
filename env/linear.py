@@ -3,9 +3,9 @@ from utils import rd_argmax
 
 
 class ArmGaussianLinear(object):
-    def __init__(self, prior_random_state=2022, reward_random_state=2023):
-        self.prior_random = np.random.RandomState(prior_random_state)
-        self.reward_random = np.random.RandomState(reward_random_state)
+    def __init__(self, prior_random_seed=2022, reward_random_seed=2023):
+        self.prior_random = np.random.default_rng(seed=prior_random_seed)
+        self.reward_random = np.random.default_rng(seed=reward_random_seed)
 
     def reward(self, arm):
         """
@@ -76,8 +76,8 @@ class ChangingLinModel(ArmGaussianLinear):
         multivariate distribution N(0, sigma*I)
         """
         super(ChangingLinModel, self).__init__(
-            prior_random_state=np.random.randint(1, 312414),
-            reward_random_state=np.random.randint(1, 312414),
+            prior_random_seed=np.random.randint(1, 312414),
+            reward_random_seed=np.random.randint(1, 312414),
         )
         self.u = u
         self.eta = eta
@@ -89,13 +89,11 @@ class ChangingLinModel(ArmGaussianLinear):
         self.t = 0
 
     def set_context(self):
-        # if self.t == 0:
-        x = self.prior_random.randn(self.n_actions, self.n_features, dtype=np.float32)
+        x = self.prior_random.standard_normal(
+            (self.n_actions, self.n_features), dtype=np.float32
+        )
         x /= np.linalg.norm(x, axis=1, keepdims=True)
         self.features = x
-
-        # self.features = self.context_features[self.t]
-        # self.t = (self.t + 1) % 1000
 
 
 class FreqChangingLinModel(ArmGaussianLinear):
@@ -112,8 +110,8 @@ class FreqChangingLinModel(ArmGaussianLinear):
         multivariate distribution N(0, sigma*I)
         """
         super(FreqChangingLinModel, self).__init__(
-            prior_random_state=0,
-            reward_random_state=np.random.randint(1, 312414),
+            prior_random_seed=0,
+            reward_random_seed=np.random.randint(1, 312414),
         )
         self.u = u
         self.eta = eta
@@ -125,7 +123,9 @@ class FreqChangingLinModel(ArmGaussianLinear):
         self.t = 0
 
     def set_context(self):
-        x = self.prior_random.randn(self.n_actions, self.n_features, dtype=np.float32)
+        x = self.prior_random.standard_normal(
+            (self.n_actions, self.n_features), dtype=np.float32
+        )
         x /= np.linalg.norm(x, axis=1, keepdims=True)
         self.features = x
 
@@ -143,8 +143,8 @@ class PaperLinModel(ArmGaussianLinear):
         multivariate distribution N(0, sigma*I)
         """
         super(PaperLinModel, self).__init__(
-            prior_random_state=np.random.randint(1, 312414),
-            reward_random_state=np.random.randint(1, 312414),
+            prior_random_seed=np.random.randint(1, 312414),
+            reward_random_seed=np.random.randint(1, 312414),
         )
         self.eta = eta
         self.features = self.prior_random.uniform(-u, u, (n_actions, n_features))
@@ -168,8 +168,8 @@ class FreqPaperLinModel(ArmGaussianLinear):
         multivariate distribution N(0, sigma*I)
         """
         super(FreqPaperLinModel, self).__init__(
-            prior_random_state=2022,
-            reward_random_state=np.random.randint(1, 312414),
+            prior_random_seed=2022,
+            reward_random_seed=np.random.randint(1, 312414),
         )
         self.eta = eta
         self.features = self.prior_random.uniform(-u, u, (n_actions, n_features))
@@ -189,8 +189,8 @@ class FGTSLinModel(ArmGaussianLinear):
         :param eta: float, std from the reward likelihood model N(a^T.theta, eta)
         """
         super(FGTSLinModel, self).__init__(
-            prior_random_state=2022,
-            reward_random_state=np.random.randint(1, 312414),
+            prior_random_seed=2022,
+            reward_random_seed=np.random.randint(1, 312414),
         )
         self.eta = eta
         self.features = np.zeros((n_actions, n_features))
@@ -227,8 +227,8 @@ class FGTSLinModel(ArmGaussianLinear):
 class ColdStartMovieLensModel(ArmGaussianLinear):
     def __init__(self, n_features=30, n_actions=207, eta=1, sigma=10):
         super(ColdStartMovieLensModel, self).__init__(
-            prior_random_state=np.random.randint(1, 312414),
-            reward_random_state=np.random.randint(1, 312414),
+            prior_random_seed=np.random.randint(1, 312414),
+            reward_random_seed=np.random.randint(1, 312414),
         )
         self.eta = eta
         self.features = np.loadtxt("Data/Vt.csv", delimiter=",").T

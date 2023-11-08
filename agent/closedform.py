@@ -85,9 +85,9 @@ class LinMAB:
     def initPrior(self):
         a0 = 0
         s0 = self.prior_sigma
-        mu_0 = a0 * np.ones(self.d)
+        mu_0 = a0 * np.ones(self.d, dtype=np.float32)
         sigma_0 = s0 * np.eye(
-            self.d
+            self.d, dtype=np.float32
         )  # to adapt according to the true distribution of theta
         return mu_0, sigma_0
 
@@ -205,7 +205,7 @@ class LinMAB:
         mu_t, Sigma_t = self.initPrior()
         S_inv = np.linalg.inv(Sigma_t)
         p_t = S_inv @ mu_t
-        sqrt_Sigma_t = sqrtm(Sigma_t)
+        sqrt_Sigma_t = sqrtm(Sigma_t).astype(np.float32)
 
         # Initialization for factor A: Sample matrix B with size d x M
         B = sample_noise(perturbed_noise, M, self.d)

@@ -259,12 +259,14 @@ def sample_noise(noise_type, M, dim=1, sparsity=2):
         B[np.arange(dim), i] = random_sign(dim)
         return B
     elif noise_type == "Sparse":
+        i = random_choice_noreplace(dim, M)[:, :sparsity]
         B = np.zeros((dim, M))
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(
             dim * sparsity
         ).reshape(dim, sparsity) / np.sqrt(sparsity)
         return B
     elif noise_type == "SparseConsistent":
+        i = random_choice_noreplace(dim, M)[:, :sparsity]
         B = np.zeros((dim, M))
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(dim).reshape(
             dim, 1

@@ -3,16 +3,10 @@ import numpy as np
 from utils import (
     rd_argmax,
     sample_noise,
-    # haar_matrix,
-    # sphere_matrix,
-    # multi_haar_matrix,
-    random_sign,
     approx_err,
 )
 from scipy.stats import norm
 from scipy.linalg import sqrtm
-
-# from scipy.stats import multivariate_normal
 
 
 class LinMAB:
@@ -26,24 +20,60 @@ class LinMAB:
             self.n_a,
             self.d,
             self.features,
-            self.pess_regret,
-            self.optimal_action,
         ) = (
             env.expect_regret,
             env.n_actions,
             env.n_features,
             env.features,
-            env.pessimism_regret,
-            env.optimal_action,
         )
         self.reward, self.eta = env.reward, env.eta
         self.prior_sigma = env.alg_prior_sigma
-        # self.flag = False
-        # self.optimal_arm = None
         self.threshold = 0.999
         self.store_IDS = False
-        # Only for Haar matrix
-        self.counter = 0
+        # For synthesis / analysis
+        self.pess_regret = env.pessimism_regret
+        self.optimal_action = env.optimal_action
+
+        self.data_groups = {
+            "reward": 1,
+            "expected_regret": 1,
+            "pess_regret": 1,
+            "est_regret": 1,
+            "potential": 1,
+            # immediate quantity for synthesis
+            "lmax": 20,
+            "lmin": 20,
+            "lmax_inv": 20,
+            "lmin_inv": 20,
+            "kappa_inv": 20,
+        }
+        self.data_groups_IS = {
+            # Only for IS
+            "approx_potential": 1,
+            "up_norm_err": 20,
+            "low_norm_err": 20,
+            "up_set_err": 20,
+            "low_set_err": 20,
+            "a_t_err": 20,
+            "a_star_err": 20,
+            # Only for IS - tilde for independent z
+            "tilde_up_norm_err": 20,
+            "tilde_low_norm_err": 20,
+            "tilde_up_set_err": 20,
+            "tilde_low_set_err": 20,
+            "tilde_a_t_err": 20,
+            "tilde_a_star_err": 20,
+        }
+
+    def data_init(self, total_steps, data_groups):
+        data = {}
+        for key, value in data_groups.items():
+            data[key] = np.full((total_steps), np.nan)
+        return data
+
+    def set_context(self):
+        self.env.set_context()
+        self.features = self.env.features
 
     def initPrior(self):
         a0 = 0
@@ -112,18 +142,17 @@ class LinMAB:
                     print(np.isnan(sigma).any(), np.isinf(sigma).any())
             return theta
 
-        # initialization for synthesis
-        reward, expected_regret = np.zeros(T), np.zeros(T)
-        pess_regret, est_regret = np.zeros(T), np.zeros(T)
-        lmax, lmin = np.zeros(T), np.zeros(T)
-        pot = np.zeros(T)
-        # TODO: add condition number, lambda_max, lambda_min of inv_Sigma matrix!
-        lmax_inv, lmin_inv, kappa_inv = np.zeros(T), np.zeros(T), np.zeros(T)
+        dic = self.data_init(T, self.data_groups)
+
         # Algorithm
         mu_t, sigma_t = self.initPrior()
         inv_sigma_t = np.linalg.inv(sigma_t)
         p_t = inv_sigma_t @ mu_t
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
+            # print("features: {}".format(self.features[:5]))
+            # input()
             # scheme for img_reward
             if scheme == "ts":
                 theta_t = posterior_sampling(mu_t, sigma_t)
@@ -135,34 +164,23 @@ class LinMAB:
             a_t = rd_argmax(img_reward)
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
 
-            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+            dic["reward"][t], dic["expected_regret"][t] = r_t, self.expect_regret(
+                a_t, self.features
+            )
             # Synthesis: lmax, lmin, pess_regret, est_regret, potential: pot; lmax_inv, lmin_inv, kappa_inv
-            pot[t] = f_t.T @ sigma_t @ f_t
-            lmax[t] = np.linalg.norm(sigma_t, 2)
-            lmin[t] = np.linalg.norm(sigma_t, -2)
-            lmax_inv[t] = np.linalg.norm(inv_sigma_t, 2)
-            lmin_inv[t] = np.linalg.norm(inv_sigma_t, -2)
-            kappa_inv[t] = np.linalg.cond(inv_sigma_t)
-
-            pess_regret[t] = self.pess_regret(a_t, self.features, img_reward)
-            est_regret[t] = expected_regret[t] - pess_regret[t]
+            dic["potential"][t] = f_t.T @ sigma_t @ f_t
+            dic["pess_regret"][t] = self.pess_regret(a_t, self.features, img_reward)
+            dic["est_regret"][t] = dic["expected_regret"][t] - dic["pess_regret"][t]
+            if t % self.data_groups["lmax"] == 0:
+                dic["lmax"][t] = np.linalg.norm(sigma_t, 2)
+                dic["lmin"][t] = np.linalg.norm(sigma_t, -2)
+                dic["lmax_inv"][t] = np.linalg.norm(inv_sigma_t, 2)
+                dic["lmin_inv"][t] = np.linalg.norm(inv_sigma_t, -2)
+                dic["kappa_inv"][t] = np.linalg.cond(inv_sigma_t)
 
             # Update posterior
             mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t)
             inv_sigma_t = self.update_inv_sigma(inv_sigma_t, f_t)
-
-        dic = {
-            "reward": reward,
-            "expected_regret": expected_regret,
-            "pess_regret": pess_regret,
-            "est_regret": est_regret,
-            "potential": pot,
-            "lmax": lmax,
-            "lmin": lmin,
-            "lmax_inv": lmax_inv,
-            "lmin_inv": lmin_inv,
-            "kappa_inv": kappa_inv,
-        }
 
         return dic
 
@@ -182,37 +200,7 @@ class LinMAB:
         2. E[ norm(index) ] = sqrt(M)
         """
 
-        # initialization for synthesis
-        reward, expected_regret = np.zeros(T), np.zeros(T)
-        pess_regret, est_regret = np.zeros(T), np.zeros(T)
-        lmax, lmin = np.zeros(T), np.zeros(T)
-        lmax_inv, lmin_inv, kappa_inv = np.zeros(T), np.zeros(T), np.zeros(T)
-
-        pot, approx_pot = np.zeros(T), np.zeros(T)
-        # synthesis quantity only for index sampling
-        (up_norm_err, low_norm_err, up_set_err, low_set_err, a_t_err, a_star_err) = (
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-        )
-        (
-            tilde_up_norm_err,
-            tilde_low_norm_err,
-            tilde_up_set_err,
-            tilde_low_set_err,
-            tilde_a_t_err,
-            tilde_a_star_err,
-        ) = (
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-            np.zeros(T),
-        )
+        dic = self.data_init(T, {**self.data_groups, **self.data_groups_IS})
 
         def index_sampling(A, mu, index, scheme="ts"):
             M = A.shape[1]
@@ -244,6 +232,8 @@ class LinMAB:
 
         # interaction
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
             # index sampling
             img_reward = index_sampling(A_t, mu_t, index, scheme=scheme)
             # action selection
@@ -251,41 +241,49 @@ class LinMAB:
             # selected feature and reward feedback
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             # compute regret
-            reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
+            dic["reward"][t], dic["expected_regret"][t] = r_t, self.expect_regret(
+                a_t, self.features
+            )
 
-            # Synthesis only for index sampling
-            a_star = self.optimal_action(self.features)
-            (
-                up_norm_err[t],
-                low_norm_err[t],
-                all_err,
-                pot[t],
-                approx_pot[t],
-            ) = approx_err(a_t, self.features, A_t @ A_t.T, Sigma_t, S_inv)
-            a_t_err[t] = all_err[a_t]
-            a_star_err[t] = all_err[a_star]
-            up_set_err[t] = np.max((all_err))
-            low_set_err[t] = np.max(-(all_err))
-            (
-                tilde_up_norm_err[t],
-                tilde_low_norm_err[t],
-                tilde_all_err,
-                _,
-                _,
-            ) = approx_err(a_t, self.features, tilde_A_t @ tilde_A_t.T, Sigma_t, S_inv)
-            tilde_a_t_err[t] = tilde_all_err[a_t]
-            tilde_a_star_err[t] = tilde_all_err[a_star]
-            tilde_up_set_err[t] = np.max((tilde_all_err))
-            tilde_low_set_err[t] = np.max(-(tilde_all_err))
+            #
+            P = A_t @ A_t.T
+            dic["approx_potential"][t] = f_t.T @ P @ f_t
+            dic["potential"][t] = f_t.T @ Sigma_t @ f_t
+            dic["pess_regret"][t] = self.pess_regret(a_t, self.features, img_reward)
+            dic["est_regret"][t] = dic["expected_regret"][t] - dic["pess_regret"][t]
+            if t % self.data_groups["lmax"] == 0:
+                # Synthesis only for index sampling (not every step)
+                a_star = self.optimal_action(self.features)
+                (
+                    dic["up_norm_err"][t],
+                    dic["low_norm_err"][t],
+                    all_err,
+                    _,
+                    _,
+                ) = approx_err(a_t, self.features, P, Sigma_t, S_inv)
+                dic["a_t_err"][t] = all_err[a_t]
+                dic["a_star_err"][t] = all_err[a_star]
+                dic["up_set_err"][t] = np.max((all_err))
+                dic["low_set_err"][t] = np.max(-(all_err))
+                tilde_P = tilde_A_t @ tilde_A_t.T
+                (
+                    dic["tilde_up_norm_err"][t],
+                    dic["tilde_low_norm_err"][t],
+                    tilde_all_err,
+                    _,
+                    _,
+                ) = approx_err(a_t, self.features, tilde_P, Sigma_t, S_inv)
+                dic["tilde_a_t_err"][t] = tilde_all_err[a_t]
+                dic["tilde_a_star_err"][t] = tilde_all_err[a_star]
+                dic["tilde_up_set_err"][t] = np.max((tilde_all_err))
+                dic["tilde_low_set_err"][t] = np.max(-(tilde_all_err))
 
-            # Synthesis: lmax, lmin, pess_regret, est_regret, potential: pot, approx_potential: approx_pot
-            lmax[t] = np.linalg.norm(Sigma_t, 2)
-            lmin[t] = np.linalg.norm(Sigma_t, -2)
-            lmax_inv[t] = np.linalg.norm(S_inv, 2)
-            lmin_inv[t] = np.linalg.norm(S_inv, -2)
-            kappa_inv[t] = np.linalg.cond(S_inv)
-            pess_regret[t] = self.pess_regret(a_t, self.features, img_reward)
-            est_regret[t] = expected_regret[t] - pess_regret[t]
+                # Synthesis: lmax, lmin, pess_regret, est_regret, potential: pot, approx_potential: approx_pot
+                dic["lmax"][t] = np.linalg.norm(Sigma_t, 2)
+                dic["lmin"][t] = np.linalg.norm(Sigma_t, -2)
+                dic["lmax_inv"][t] = np.linalg.norm(S_inv, 2)
+                dic["lmin_inv"][t] = np.linalg.norm(S_inv, -2)
+                dic["kappa_inv"][t] = np.linalg.cond(S_inv)
 
             # incremental update on Sigma and mu
             # Sigma_t = self.rankone_update(f_t, Sigma_t)
@@ -302,33 +300,6 @@ class LinMAB:
             tilde_P_t += np.outer(f_t, tilde_b_t) / self.eta
             tilde_A_t = Sigma_t @ tilde_P_t
 
-        dic = {
-            "reward": reward,
-            "expected_regret": expected_regret,
-            "pess_regret": pess_regret,
-            "est_regret": est_regret,
-            "potential": pot,
-            "approx_potential": approx_pot,
-            "lmax": lmax,
-            "lmin": lmin,
-            "lmax_inv": lmax_inv,
-            "lmin_inv": lmin_inv,
-            "kappa_inv": kappa_inv,
-            #
-            "up_norm_err": up_norm_err,
-            "low_norm_err": low_norm_err,
-            "up_set_err": up_set_err,
-            "low_set_err": low_set_err,
-            "a_t_err": a_t_err,
-            "a_star_err": a_star_err,
-            # tilde for independent z
-            "tilde_up_norm_err": tilde_up_norm_err,
-            "tilde_low_norm_err": tilde_low_norm_err,
-            "tilde_up_set_err": tilde_up_set_err,
-            "tilde_low_set_err": tilde_low_set_err,
-            "tilde_a_t_err": tilde_a_t_err,
-            "tilde_a_star_err": tilde_a_star_err,
-        }
         return dic
 
     def ES(self, T, M=10):
@@ -344,6 +315,9 @@ class LinMAB:
         A_t = mu_t.reshape((self.d, 1)) + sqrtm(Sigma_t) @ B
         P_t = np.linalg.inv(Sigma_t) @ A_t
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
+            # Ensemble sampling
             i = np.random.choice(M, 1)[0]
             theta_t = A_t[:, [i]]
             a_t = rd_argmax(np.dot(self.features, theta_t))
@@ -374,6 +348,9 @@ class LinMAB:
         )
         r_t = self.reward(a_t)
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
+            # Algorithm
             A_t += np.outer(self.features[a_t, :], self.features[a_t, :])
             b_t += r_t * self.features[a_t, :]
             inv_A = np.linalg.inv(A_t)
@@ -398,6 +375,9 @@ class LinMAB:
         mu_t, sigma_t = self.initPrior()
         p_t = np.linalg.inv(sigma_t) @ mu_t
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
+            # Algorithm
             a_t = rd_argmax(
                 np.dot(self.features, mu_t)
                 + norm.ppf(t / (t + 1))
@@ -421,6 +401,9 @@ class LinMAB:
         mu_t, sigma_t = self.initPrior()
         p_t = np.linalg.inv(sigma_t) @ mu_t
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
+            # Algorithm
             beta_t = 2 * np.log(self.n_a * ((t + 1) * np.pi) ** 2 / 6 / 0.1)
             a_t = rd_argmax(
                 np.dot(self.features, mu_t)
@@ -448,6 +431,9 @@ class LinMAB:
         mu_t, sigma_t = self.initPrior()
         p_t = np.linalg.inv(sigma_t) @ mu_t
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
+            # Algorithm
             beta_t = c * np.log(t + 1)
             a_t = rd_argmax(
                 np.dot(self.features, mu_t)
@@ -526,10 +512,12 @@ class LinMAB:
         p_t = np.linalg.inv(sigma_t) @ mu_t
         reward, expected_regret = np.zeros(T), np.zeros(T)
         for t in range(T):
+            # Changing action set (If env applicable)
+            self.set_context()
+            # Algorithm
             thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
             a_t, p_a = self.computeVIDS(thetas)
             r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
-            # r_t, mu_t, sigma_t = self.updatePosterior(a_t, mu_t, sigma_t)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
 
         return reward, expected_regret

@@ -371,7 +371,7 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
                     ),
                 )
                 for key, mean, cum in [
-                    (key, np.mean(value, axis=0), value)
+                    (key, np.nanmean(value, axis=0), value)
                     for key, value in cum_dic.items()
                 ]
             ]
@@ -394,7 +394,7 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
                     ),
                 )
                 for key, mean, cum in [
-                    (key, np.mean(value, axis=0), value)
+                    (key, np.nanmean(value, axis=0), value)
                     for key, value in all_dic.items()
                 ]
             ]

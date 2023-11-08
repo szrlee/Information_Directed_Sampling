@@ -9,6 +9,8 @@ from env.linear import (
     PaperLinModel,
     FreqPaperLinModel,
     ColdStartMovieLensModel,
+    ChangingLinModel,
+    FreqChangingLinModel,
 )
 from env.finitecontext import (
     FiniteContextFGTSLinModel,
@@ -171,6 +173,26 @@ def LinMAB_expe(
         ]
         log = False
         title = "Linear Gaussian Model (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    elif problem == "ChangingRusso":
+        u = 1 / np.sqrt(5)
+        models = [
+            LinMAB(ChangingLinModel(u, n_features, n_arms, sigma=10))
+            for _ in range(n_expe)
+        ]
+        log = False
+        title = "Linear Gaussian Model with Changing Arm Set (Bayes MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
+            n_arms, n_features
+        )
+    elif problem == "ChangingFreqRusso":
+        u = 1 / np.sqrt(5)
+        models = [
+            LinMAB(FreqChangingLinModel(u, n_features, n_arms, sigma=10))
+            for _ in range(n_expe)
+        ]
+        log = False
+        title = "Linear Gaussian Model with Changing Arm Set (Freq MOD, Russo and Van Roy, 2018) - n_arms: {} - n_features: {}".format(
             n_arms, n_features
         )
     else:

@@ -62,17 +62,66 @@ class ArmGaussianLinear(object):
 
         return best_arm_reward - img_reward[arm]
 
-    # def estimation_regret(self, arm, action_set, img_theta):
-    #     """
-    #     Compute the estimation regret of a single step
-    #     """
-    #     arm_reward = np.dot(action_set, self.real_theta)
-    #     # best_arm_reward = arm_reward.max()
-    #     expect_reward = arm_reward[arm]
-    #     arm_reward = np.dot(action_set, img_theta)
-    #     img_reward = arm_reward[arm]
 
-    #     return img_reward - expect_reward
+class ChangingLinModel(ArmGaussianLinear):
+    def __init__(self, u, n_features, n_actions, eta=1, sigma=10):
+        """
+        Initialization of the arms, features and theta in
+        Russo, Daniel, and Benjamin Van Roy. "Learning to optimize via information-directed sampling." Operations Research 66.1 (2018): 230-252.
+        :param u: float, features are drawn from a uniform Unif(-u, u)
+        :param n_features: int, dimension of the feature vectors
+        :param n_actions: int, number of actions
+        :param eta: float, std from the reward N(a^T.theta, eta)
+        :param sigma: float, multiplicative factor for the covariance matrix of theta which is drawn from a
+        multivariate distribution N(0, sigma*I)
+        """
+        super(ChangingLinModel, self).__init__(
+            prior_random_state=np.random.randint(1, 312414),
+            reward_random_state=np.random.randint(1, 312414),
+        )
+        self.u = u
+        self.eta = eta
+        self.features = np.zeros((n_actions, n_features))
+        self.real_theta = self.prior_random.multivariate_normal(
+            np.zeros(n_features), sigma * np.eye(n_features)
+        )
+        self.alg_prior_sigma = sigma
+
+    def set_context(self):
+        x = self.prior_random.randn(self.n_actions, self.n_features).astype(np.float32)
+        x /= np.linalg.norm(x, axis=1, keepdims=True)
+        self.features = x
+
+
+class FreqChangingLinModel(ArmGaussianLinear):
+    def __init__(self, u, n_features, n_actions, eta=1, sigma=10):
+        """
+        (Frequentist modification: use fixed random seed to sample arms, features and theta.)
+        Initialization of the arms, features and theta in
+        Russo, Daniel, and Benjamin Van Roy. "Learning to optimize via information-directed sampling." Operations Research 66.1 (2018): 230-252.
+        :param u: float, features are drawn from a uniform Unif(-u, u)
+        :param n_features: int, dimension of the feature vectors
+        :param n_actions: int, number of actions
+        :param eta: float, std from the reward N(a^T.theta, eta)
+        :param sigma: float, multiplicative factor for the covariance matrix of theta which is drawn from a
+        multivariate distribution N(0, sigma*I)
+        """
+        super(FreqChangingLinModel, self).__init__(
+            prior_random_state=0,
+            reward_random_state=np.random.randint(1, 312414),
+        )
+        self.u = u
+        self.eta = eta
+        self.features = np.zeros((n_actions, n_features))
+        self.real_theta = self.prior_random.multivariate_normal(
+            np.zeros(n_features), sigma * np.eye(n_features)
+        )
+        self.alg_prior_sigma = sigma
+
+    def set_context(self):
+        x = self.prior_random.randn(self.n_actions, self.n_features).astype(np.float32)
+        x /= np.linalg.norm(x, axis=1, keepdims=True)
+        self.features = x
 
 
 class PaperLinModel(ArmGaussianLinear):

@@ -26,7 +26,14 @@ def get_args():
         "--game",
         type=str,
         default="Russo",
-        choices=["Russo", "FreqRusso", "Zhang", "movieLens"],
+        choices=[
+            "Russo",
+            "FreqRusso",
+            "Zhang",
+            "movieLens",
+            "ChangingRusso",
+            "FreqChangingRusso",
+        ],
     )
     parser.add_argument("--time-period", type=int, default=50)
     parser.add_argument("--n-expe", type=int, default=3)
@@ -131,8 +138,18 @@ game_config = {
         "n_arms": args.n_arms,
         "T": args.time_period,
     },
-    "movieLens": {"n_features": 30, "n_arms": 207, "T": args.time_period},
     "Russo": {"n_features": args.d_theta, "n_arms": args.n_arms, "T": args.time_period},
+    "ChangingFreqRusso": {
+        "n_features": args.d_theta,
+        "n_arms": args.n_arms,
+        "T": args.time_period,
+    },
+    "ChangingRusso": {
+        "n_features": args.d_theta,
+        "n_arms": args.n_arms,
+        "T": args.time_period,
+    },
+    "movieLens": {"n_features": 30, "n_arms": 207, "T": args.time_period},
     "Zhang": {"n_features": args.d_theta, "n_arms": args.n_arms, "T": args.time_period},
 }
 

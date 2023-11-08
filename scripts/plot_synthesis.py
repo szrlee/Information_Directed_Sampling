@@ -26,6 +26,8 @@ GMAE_NAMES = {
     "FreqRusso": "FreqRusso",
     "movieLens": "Movie",
     "Russo": "BayesRusso",
+    "ChangingRusso": "ChangingBayesRusso",
+    "FreqRusso": "ChangingFreqRusso",
     "Bernoulli": "Bernoulli",
     "Gaussian": "Gaussian",
     "synthetic-v1": "Synthetic h1",
@@ -53,10 +55,10 @@ path = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 path
 
 # %%
-game_name = "Russo"
+game_name = "ChangingRusso"
 
 # %%
-time_tag = "20230816"
+time_tag = "20231108"
 
 # %%
 load_path = f"{path}/results/bandit/{game_name}/{time_tag}"
@@ -165,13 +167,25 @@ def plotall(ax, dict, set_y_label, title, k, syn="expected_regret", is_cum=False
             continue
         if syn not in dict[key].keys():
             continue
-        x = np.arange(dict[key][syn]["mean"].shape[-1])
+        mean = dict[key][syn]["mean"]
+        x = np.arange(mean.shape[-1])
+        non_nan_indices = ~np.isnan(mean)
+        x_non_nan = x[non_nan_indices]
         low_CI_bound, high_CI_bound = (
             dict[key][syn]["low_CI"],
             dict[key][syn]["high_CI"],
         )
-        ax.plot(x, dict[key][syn]["mean"], label=key)
-        ax.fill_between(x, low_CI_bound, high_CI_bound, alpha=0.2)
+        ax.plot(
+            x_non_nan,
+            mean[non_nan_indices],
+            label=key,
+        )
+        ax.fill_between(
+            x_non_nan,
+            low_CI_bound[non_nan_indices],
+            high_CI_bound[non_nan_indices],
+            alpha=0.2,
+        )
         ax.legend(loc="lower right")
 
 
@@ -217,7 +231,7 @@ for title in cum_quantities.keys():
             cum_quantities[title],
             False,
             title,
-            "IS:Normal_UnifGrid",
+            "IS:Normal_UnifCube",
             syn,
             True,
         )
@@ -253,7 +267,7 @@ for title in cum_quantities.keys():
             cum_quantities[title],
             False,
             title,
-            "IS:PMCoord_UnifGrid",
+            "IS:PMCoord_UnifCube",
             syn,
             True,
         )
@@ -289,7 +303,7 @@ for title in cum_quantities.keys():
             cum_quantities[title],
             False,
             title,
-            "IS:Sphere_UnifGrid",
+            "IS:Sphere_UnifCube",
             syn,
             True,
         )
@@ -307,7 +321,7 @@ for title in cum_quantities.keys():
             cum_quantities[title],
             True,
             title,
-            "IS:UnifGrid_Sphere",
+            "IS:UnifCube_Sphere",
             syn,
             True,
         )
@@ -316,7 +330,7 @@ for title in cum_quantities.keys():
             cum_quantities[title],
             False,
             title,
-            "IS:UnifGrid_Gaussian",
+            "IS:UnifCube_Gaussian",
             syn,
             True,
         )
@@ -325,7 +339,7 @@ for title in cum_quantities.keys():
             cum_quantities[title],
             False,
             title,
-            "IS:UnifGrid_UnifGrid",
+            "IS:UnifCube_UnifCube",
             syn,
             True,
         )
@@ -334,7 +348,7 @@ for title in cum_quantities.keys():
             cum_quantities[title],
             False,
             title,
-            "IS:UnifGrid_PMCoord",
+            "IS:UnifCube_PMCoord",
             syn,
             True,
         )
@@ -400,7 +414,7 @@ for title in all_quantities.keys():
             all_quantities[title],
             False,
             title,
-            "IS:Normal_UnifGrid",
+            "IS:Normal_UnifCube",
             syn,
         )
         plotall(
@@ -427,7 +441,7 @@ for title in all_quantities.keys():
             all_quantities[title],
             False,
             title,
-            "IS:PMCoord_UnifGrid",
+            "IS:PMCoord_UnifCube",
             syn,
         )
         plotall(
@@ -452,7 +466,7 @@ for title in all_quantities.keys():
             all_quantities[title],
             False,
             title,
-            "IS:Sphere_UnifGrid",
+            "IS:Sphere_UnifCube",
             syn,
         )
         plotall(
@@ -464,14 +478,14 @@ for title in all_quantities.keys():
             syn,
         )
         plotall(
-            axes[3][0], all_quantities[title], True, title, "IS:UnifGrid_Sphere", syn
+            axes[3][0], all_quantities[title], True, title, "IS:UnifCube_Sphere", syn
         )
         plotall(
             axes[3][1],
             all_quantities[title],
             False,
             title,
-            "IS:UnifGrid_Gaussian",
+            "IS:UnifCube_Gaussian",
             syn,
         )
         plotall(
@@ -479,7 +493,7 @@ for title in all_quantities.keys():
             all_quantities[title],
             False,
             title,
-            "IS:UnifGrid_UnifGrid",
+            "IS:UnifCube_UnifCube",
             syn,
         )
         plotall(
@@ -487,7 +501,7 @@ for title in all_quantities.keys():
             all_quantities[title],
             False,
             title,
-            "IS:UnifGrid_PMCoord",
+            "IS:UnifCube_PMCoord",
             syn,
         )
         # plotall(axes[2][0], all_regs, mean_reg, True, title, "IS:Sphere_Gaussian")

@@ -81,9 +81,10 @@ class ChangingLinModel(ArmGaussianLinear):
         )
         self.u = u
         self.eta = eta
-        self.features = np.zeros((n_actions, n_features))
+        self.features = np.zeros((n_actions, n_features), dtype=np.float32)
         self.real_theta = self.prior_random.multivariate_normal(
-            np.zeros(n_features), sigma * np.eye(n_features)
+            np.zeros(n_features, dtype=np.float32),
+            sigma * np.eye(n_features, dtype=np.float32),
         )
         self.alg_prior_sigma = sigma
         self.t = 0
@@ -115,9 +116,10 @@ class FreqChangingLinModel(ArmGaussianLinear):
         )
         self.u = u
         self.eta = eta
-        self.features = np.zeros((n_actions, n_features))
+        self.features = np.zeros((n_actions, n_features), dtype=np.float32)
         self.real_theta = self.prior_random.multivariate_normal(
-            np.zeros(n_features), sigma * np.eye(n_features)
+            np.zeros(n_features, dtype=np.float32),
+            sigma * np.eye(n_features, dtype=np.float32),
         )
         self.alg_prior_sigma = sigma
         self.t = 0

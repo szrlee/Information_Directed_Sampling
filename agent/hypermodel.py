@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 import numpy as np
 import torch
 import torch.nn as nn
-from utils import rng
 
 
 def mlp(input_dim, hidden_sizes, linear_layer=nn.Linear):
@@ -29,7 +28,7 @@ class PriorHyperLinear(torch.nn.Module):
 
         self.in_features, self.out_features = input_size, output_size
         # (fan-out, fan-in)
-        self.weight = rng.standard_normal((output_size, input_size), dtype=np.float32)
+        self.weight = np.random.randn(output_size, input_size, dtype=np.float32)
         self.weight = self.weight / np.linalg.norm(self.weight, axis=1, keepdims=True)
 
         if isinstance(prior_mean, np.ndarray):
@@ -181,7 +180,7 @@ class ReplayBuffer:
         return self.sample_num
 
     def _unit_sphere_noise(self):
-        noise = rng.standard_normal(self.noise_dim, dtype=np.float32)
+        noise = np.random.randn(self.noise_dim, dtype=np.float32)
         noise /= np.linalg.norm(noise)
         return noise
 

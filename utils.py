@@ -568,8 +568,8 @@ def approx_err(a, action_set, P, Q, Q_inv):
     low_norm_err = 1 - np.linalg.norm(Q_inv @ P, -2)  # eps_2 = (1- (1-eps_2))
     # norm_err = max(up_norm_err, low_norm_err)
     # t = time.time()
-    xPx = np.zeros(len(action_set))
-    xQx = np.zeros(len(action_set))
+    xPx = np.zeros(len(action_set), dtype=np.float32)
+    xQx = np.zeros(len(action_set), dtype=np.float32)
     for i in range(len(action_set)):
         xPx[i] = np.dot(action_set[i], np.dot(P, action_set[i]))
         xQx[i] = np.dot(action_set[i], np.dot(Q, action_set[i]))

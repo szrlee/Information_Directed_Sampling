@@ -10,7 +10,6 @@ from utils import (
 )
 from scipy.stats import norm
 from scipy.linalg import sqrtm
-import numba as nb
 
 
 class LinMAB:
@@ -82,12 +81,12 @@ class LinMAB:
         self.env.set_context()
         self.features = self.env.features
 
-    def initPrior(self):
+    def initPrior(self, dtype=np.float64):
         a0 = 0
         s0 = self.prior_sigma
-        mu_0 = a0 * np.ones(self.d, dtype=np.float32)
+        mu_0 = a0 * np.ones(self.d, dtype=dtype)
         sigma_0 = s0 * np.eye(
-            self.d, dtype=np.float32
+            self.d, dtype=dtype
         )  # to adapt according to the true distribution of theta
         return mu_0, sigma_0
 
@@ -202,7 +201,7 @@ class LinMAB:
                 raise NotImplementedError
 
         # Algorithm initialization
-        mu_t, Sigma_t = self.initPrior()
+        mu_t, Sigma_t = self.initPrior(dtype=np.float32)
         S_inv = np.linalg.inv(Sigma_t)
         p_t = S_inv @ mu_t
         sqrt_Sigma_t = sqrtm(Sigma_t).astype(np.float32)
@@ -291,7 +290,9 @@ class LinMAB:
         """
         Ensemble sampling
         """
-        reward, expected_regret = np.zeros(T), np.zeros(T)
+        reward, expected_regret = np.zeros(T, dtype=np.float32), np.zeros(
+            T, dtype=np.float32
+        )
         mu_t, Sigma_t = self.initPrior()
         # A_t = np.zeros((self.d, M))
         # P_t = np.zeros((self.d, M))

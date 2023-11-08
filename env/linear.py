@@ -86,11 +86,16 @@ class ChangingLinModel(ArmGaussianLinear):
             np.zeros(n_features), sigma * np.eye(n_features)
         )
         self.alg_prior_sigma = sigma
+        self.t = 0
 
     def set_context(self):
-        x = self.prior_random.randn(self.n_actions, self.n_features).astype(np.float32)
+        # if self.t == 0:
+        x = self.prior_random.randn(self.n_actions, self.n_features, dtype=np.float32)
         x /= np.linalg.norm(x, axis=1, keepdims=True)
         self.features = x
+
+        # self.features = self.context_features[self.t]
+        # self.t = (self.t + 1) % 1000
 
 
 class FreqChangingLinModel(ArmGaussianLinear):
@@ -117,9 +122,10 @@ class FreqChangingLinModel(ArmGaussianLinear):
             np.zeros(n_features), sigma * np.eye(n_features)
         )
         self.alg_prior_sigma = sigma
+        self.t = 0
 
     def set_context(self):
-        x = self.prior_random.randn(self.n_actions, self.n_features).astype(np.float32)
+        x = self.prior_random.randn(self.n_actions, self.n_features, dtype=np.float32)
         x /= np.linalg.norm(x, axis=1, keepdims=True)
         self.features = x
 

@@ -51,8 +51,8 @@ class BetaBernoulliMAB(GenericMAB):
         :param a1: int, multiplicative factor for beta
         :return: np.arrays, prior values (alpha, beta) for each earm
         """
-        beta1 = a0 * np.ones(self.nb_arms).astype(int)
-        beta2 = a1 * np.ones(self.nb_arms).astype(int)
+        beta1 = a0 * np.ones(self.nb_arms, dtype=int)
+        beta2 = a1 * np.ones(self.nb_arms, dtype=int)
         return beta1, beta2
 
     def TS(self, T):
@@ -278,7 +278,7 @@ class BetaBernoulliMAB(GenericMAB):
             # Posterior update
             beta1[arm], beta2[arm] = beta1[arm] + reward[t], beta2[arm] + 1 - reward[t]
             if display_results:
-                utils.display_results(delta, g, delta ** 2 / g, p_star)
+                utils.display_results(delta, g, delta**2 / g, p_star)
             f, F, G, B = self.update_approx(arm, reward[t], prev_beta, X, f, F, G, B)
 
         return reward, expected_regret
@@ -387,7 +387,7 @@ class BetaBernoulliMAB(GenericMAB):
                         for a in range(self.nb_arms)
                     ]
                 )
-                arm = rd_argmax(-(delta ** 2) / v)
+                arm = rd_argmax(-(delta**2) / v)
             else:
                 g = np.array(
                     [

@@ -61,10 +61,10 @@ class GaussianMAB(GenericMAB):
         :return: np.arrays, updated means and stds
         """
         # eta = self.MAB[arm].eta
-        mu[arm] = (eta ** 2 * mu[arm] + r * sigma[arm] ** 2) / (
-            eta ** 2 + sigma[arm] ** 2
+        mu[arm] = (eta**2 * mu[arm] + r * sigma[arm] ** 2) / (
+            eta**2 + sigma[arm] ** 2
         )
-        sigma[arm] = np.sqrt((eta * sigma[arm]) ** 2 / (eta ** 2 + sigma[arm] ** 2))
+        sigma[arm] = np.sqrt((eta * sigma[arm]) ** 2 / (eta**2 + sigma[arm] ** 2))
         return mu, sigma
 
     def ES(self, T, M=10):
@@ -76,7 +76,7 @@ class GaussianMAB(GenericMAB):
         mu0 = self.mu0
         s0 = self.s0
         eta = self.eta
-        beta = eta ** 2 / s0 ** 2
+        beta = eta**2 / s0**2
         Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         mu_0, sigma_0 = self.init_prior(mu0=mu0, s0=s0)
         B = np.random.normal(0, 1, (self.nb_arms, M))
@@ -131,7 +131,7 @@ class GaussianMAB(GenericMAB):
         # Init
         mu_0 = mu0 * np.ones(self.nb_arms)
         b_0 = self.rand_vec_gen(M, N=self.nb_arms, haar=haar)  # shape N x M
-        beta = eta ** 2 / s0 ** 2
+        beta = eta**2 / s0**2
         Sa, Na, reward, arm_sequence, expected_regret = self.init_lists(T)
         Sxia = np.zeros((self.nb_arms, M))
 
@@ -260,8 +260,8 @@ class GaussianMAB(GenericMAB):
                     for arm in range(self.nb_arms)
                 ]
             )
-            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma ** 2 + eta ** 2))
-            s_t = np.sqrt(sigma ** 2 - sigma_next ** 2)
+            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma**2 + eta**2))
+            s_t = np.sqrt(sigma**2 - sigma_next**2)
             v = s_t * self.kgf(-np.absolute(delta_t / (s_t + 10e-9)))
             arm = rd_argmax(mu + (T - t) * v)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
@@ -290,8 +290,8 @@ class GaussianMAB(GenericMAB):
                 ]
             )
             r = (delta_t / sigma) ** 2
-            m_lower = eta / (4 * sigma ** 2) * (-1 + r + np.sqrt(1 + 6 * r + r ** 2))
-            m_higher = eta / (4 * sigma ** 2) * (1 + r + np.sqrt(1 + 10 * r + r ** 2))
+            m_lower = eta / (4 * sigma**2) * (-1 + r + np.sqrt(1 + 6 * r + r**2))
+            m_higher = eta / (4 * sigma**2) * (1 + r + np.sqrt(1 + 10 * r + r**2))
             m_star = np.zeros(self.nb_arms)
             for arm in range(self.nb_arms):
                 if T - t <= m_lower[arm]:
@@ -299,14 +299,14 @@ class GaussianMAB(GenericMAB):
                 elif (delta_t[arm] == 0) or (m_higher[arm] <= 1):
                     m_star[arm] = 1
                 else:
-                    m_star[arm] = np.ceil(0.5 * ((m_lower + m_higher)[arm])).astype(
-                        int
+                    m_star[arm] = np.ceil(
+                        0.5 * ((m_lower + m_higher)[arm]), dtype=int
                     )  # approximation
-            s_m = np.sqrt((m_star + 1) * sigma ** 2 / ((eta / sigma) ** 2 + m_star + 1))
+            s_m = np.sqrt((m_star + 1) * sigma**2 / ((eta / sigma) ** 2 + m_star + 1))
             v_m = s_m * self.kgf(-np.absolute(delta_t / (s_m + 10e-9)))
             arm = rd_argmax(mu - np.max(mu) + (T - t) * v_m)
             self.update_lists(t, arm, Sa, Na, reward, arm_sequence, expected_regret)
-            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma ** 2 + eta ** 2))
+            sigma_next = np.sqrt(((sigma * eta) ** 2) / (sigma**2 + eta**2))
             mu[arm] = (eta[arm] ** 2 * mu[arm] + reward[t] * sigma[arm] ** 2) / (
                 eta[arm] ** 2 + sigma[arm] ** 2
             )

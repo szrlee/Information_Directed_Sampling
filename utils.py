@@ -2,6 +2,7 @@
 import numpy as np
 import os
 import csv
+import numba as nb
 
 import random as rd
 import matplotlib.pyplot as plt
@@ -163,37 +164,86 @@ def labelColor(methods):
     return labels, colors, markers
 
 
+# @nb.njit
+def rankone_update(f, Sigma, eta):
+    ffT = np.outer(f, f)
+    return Sigma - (Sigma @ ffT @ Sigma) / (eta**2 + f @ Sigma @ f)
+
+
+# @nb.njit
+def updatePosterior(sigma, p, f, r, eta):
+    """
+    Update posterior mean and covariance matrix incrementally
+    without matrix inversion
+    :param arm: int, arm chose
+    :param sigma: np.array, posterior covariance matrix
+    :param p: np.array, sigma_inv mu
+    :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
+    """
+    sigma_ = rankone_update(f, sigma, eta)
+    p_ = p + ((r * f) / eta**2)
+    mu_ = sigma_ @ p_
+    return mu_, sigma_, p_
+
+
+# @nb.njit
+def update_inv_sigma(inv_sigma, f, eta):
+    ffT = np.outer(f, f)
+    return inv_sigma + (1 / eta**2) * ffT
+
+
+# @nb.njit
 def rd_argmax(vector):
     """
     Compute random among eligible maximum indices
     :param vector: np.array
     :return: int, random index among eligible maximum indices
     """
+    # vector += 1e-20 * np.random.randn(len(vector))
+    # return np.argmax(vector)
     m = np.amax(vector)
     indices = np.nonzero(vector == m)[0]
     return rd.choice(indices)
 
 
+# @nb.njit
 def haar_matrix(M):
     """
     Haar random matrix generation
     """
-    z = np.random.randn(M, M).astype(np.float32)
+    z = np.random.randn(M, M, dtype=np.float32)
     q, r = np.linalg.qr(z)
     d = np.diag(r)
     ph = d / np.abs(d)
     return np.multiply(q, ph)
 
 
+# @nb.njit
 def sphere_matrix(N, M):
-    v = np.random.randn(N, M).astype(np.float32)
+    v = np.random.randn(N, M, dtype=np.float32)
     v /= np.linalg.norm(v, axis=1, keepdims=True)
     return v
 
 
+# # @nb.njit
+# def sphere_matrix(N, M):
+#     v = np.random.randn(N, M)
+#     v /= np.sqrt((v**2).sum(axis=1)).reshape(-1, 1)
+#     return v
+
+
+# @nb.njit
 def random_choice_noreplace(m, n, axis=-1):
     # m, n are the number of rows, cols of output
     return np.random.rand(m, n).argsort(axis=axis)
+
+
+# @nb.njit
+def random_sign(N=None):
+    if (N is None) or (N == 1):
+        return np.random.randint(0, 2, 1) * 2 - 1
+    elif N > 1:
+        return np.random.randint(0, 2, N) * 2 - 1
 
 
 def sample_noise(noise_type, M, dim=1, sparsity=2):
@@ -209,14 +259,12 @@ def sample_noise(noise_type, M, dim=1, sparsity=2):
         B[np.arange(dim), i] = random_sign(dim)
         return B
     elif noise_type == "Sparse":
-        i = random_choice_noreplace(dim, M)[:, :sparsity]
         B = np.zeros((dim, M))
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(
             dim * sparsity
         ).reshape(dim, sparsity) / np.sqrt(sparsity)
         return B
     elif noise_type == "SparseConsistent":
-        i = random_choice_noreplace(dim, M)[:, :sparsity]
         B = np.zeros((dim, M))
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(dim).reshape(
             dim, 1
@@ -490,13 +538,6 @@ def build_bernoulli_finite_set(L, K):
     return p, q, r
 
 
-def random_sign(N=None):
-    if (N is None) or (N == 1):
-        return np.random.randint(0, 2, 1) * 2 - 1
-    elif N > 1:
-        return np.random.randint(0, 2, N) * 2 - 1
-
-
 def set_seed(seed, use_torch=False):
     np.random.seed(seed)
     rd.seed(seed)
@@ -510,6 +551,7 @@ def set_seed(seed, use_torch=False):
             torch.cuda.manual_seed(seed)
 
 
+@nb.njit
 def approx_err(a, action_set, P, Q, Q_inv):
     # Compute the approximation error of P. Q is the matrix to be approximated.
     # Q_inv = np.linalg.inv(Q)
@@ -517,13 +559,19 @@ def approx_err(a, action_set, P, Q, Q_inv):
     low_norm_err = 1 - np.linalg.norm(Q_inv @ P, -2)  # eps_2 = (1- (1-eps_2))
     # norm_err = max(up_norm_err, low_norm_err)
     # t = time.time()
-    xPx = np.einsum("ij,jk,ki->i", action_set, P, action_set.T)
+    xPx = np.zeros(len(action_set))
+    xQx = np.zeros(len(action_set))
+    for i in range(len(action_set)):
+        xPx[i] = np.dot(action_set[i], np.dot(P, action_set[i]))
+        xQx[i] = np.dot(action_set[i], np.dot(Q, action_set[i]))
+    # xPx = np.zeros(len(action_set))
     # print(np.round_(time.time() - t, 3), "sec elapsed")
     # t = time.time()
     # xPxt = np.diag(action_set @ P @ action_set.T)
     # print(np.round_(time.time() - t, 3), "sec elapsed")
     # print(np.allclose(xPx, xPxt))
-    xQx = np.einsum("ij,jk,ki->i", action_set, Q, action_set.T)
+    # xQx = np.einsum("ij,jk,ki->i", action_set, Q, action_set.T)
+    # xQx = np.zeros(len(action_set))
     # pot = xQx[a]
     # approx_pot = xPx[a]
 

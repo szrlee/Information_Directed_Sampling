@@ -4,9 +4,13 @@ from utils import (
     rd_argmax,
     sample_noise,
     approx_err,
+    rankone_update,
+    update_inv_sigma,
+    updatePosterior,
 )
 from scipy.stats import norm
 from scipy.linalg import sqrtm
+import numba as nb
 
 
 class LinMAB:
@@ -33,6 +37,9 @@ class LinMAB:
         # For synthesis / analysis
         self.pess_regret = env.pessimism_regret
         self.optimal_action = env.optimal_action
+        self.updatePosterior_ = updatePosterior
+        self.rankone_update = rankone_update
+        self.update_inv_sigma = update_inv_sigma
 
         self.data_groups = {
             "reward": 1,
@@ -84,45 +91,23 @@ class LinMAB:
         )  # to adapt according to the true distribution of theta
         return mu_0, sigma_0
 
-    def updatePosterior(self, a, mu, sigma):
-        """
-        Update posterior mean and covariance matrix
-        :param arm: int, arm chose
-        :param mu: np.array, posterior mean vector
-        :param sigma: np.array, posterior covariance matrix
-        :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
-        """
-        f, r = self.features[a], self.reward(a)[0]
-        s_inv = np.linalg.inv(sigma)
-        ffT = np.outer(f, f)
-        mu_ = np.dot(
-            np.linalg.inv(s_inv + ffT / self.eta**2),
-            np.dot(s_inv, mu) + r * f / self.eta**2,
-        )
-        sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
-        return r, mu_, sigma_
-
-    def rankone_update(self, f, Sigma):
-        ffT = np.outer(f, f)
-        return Sigma - (Sigma @ ffT @ Sigma) / (self.eta**2 + f @ Sigma @ f)
-
-    def updatePosterior_(self, sigma, p, f, r):
-        """
-        Update posterior mean and covariance matrix incrementally
-        without matrix inversion
-        :param arm: int, arm chose
-        :param sigma: np.array, posterior covariance matrix
-        :param p: np.array, sigma_inv mu
-        :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
-        """
-        sigma_ = self.rankone_update(f, sigma)
-        p_ = p + ((r * f) / self.eta**2)
-        mu_ = sigma_ @ p_
-        return mu_, sigma_, p_
-
-    def update_inv_sigma(self, inv_sigma, f):
-        ffT = np.outer(f, f)
-        return inv_sigma + (1 / self.eta**2) * ffT
+    # def updatePosterior(self, a, mu, sigma):
+    #     """
+    #     Update posterior mean and covariance matrix
+    #     :param arm: int, arm chose
+    #     :param mu: np.array, posterior mean vector
+    #     :param sigma: np.array, posterior covariance matrix
+    #     :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
+    #     """
+    #     f, r = self.features[a], self.reward(a)[0]
+    #     s_inv = np.linalg.inv(sigma)
+    #     ffT = np.outer(f, f)
+    #     mu_ = np.dot(
+    #         np.linalg.inv(s_inv + ffT / self.eta**2),
+    #         np.dot(s_inv, mu) + r * f / self.eta**2,
+    #     )
+    #     sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
+    #     return r, mu_, sigma_
 
     def TS(self, T, scheme="ts"):
         """
@@ -179,11 +164,12 @@ class LinMAB:
                 dic["kappa_inv"][t] = np.linalg.cond(inv_sigma_t)
 
             # Update posterior
-            mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t)
-            inv_sigma_t = self.update_inv_sigma(inv_sigma_t, f_t)
+            mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t, self.eta)
+            inv_sigma_t = self.update_inv_sigma(inv_sigma_t, f_t, self.eta)
 
         return dic
 
+    # @nb.njit
     def IS(
         self,
         T,
@@ -286,9 +272,8 @@ class LinMAB:
                 dic["kappa_inv"][t] = np.linalg.cond(S_inv)
 
             # incremental update on Sigma and mu
-            # Sigma_t = self.rankone_update(f_t, Sigma_t)
-            mu_t, Sigma_t, p_t = self.updatePosterior_(Sigma_t, p_t, f_t, r_t)
-            S_inv = self.update_inv_sigma(S_inv, f_t)
+            mu_t, Sigma_t, p_t = self.updatePosterior_(Sigma_t, p_t, f_t, r_t, self.eta)
+            S_inv = self.update_inv_sigma(S_inv, f_t, self.eta)
 
             # Update covariance factor A
             b_t = sample_noise(perturbed_noise, M)[0]
@@ -385,7 +370,8 @@ class LinMAB:
                     np.diagonal(np.dot(np.dot(self.features, sigma_t), self.features.T))
                 )
             )
-            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t, self.eta)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
 
         return reward, expected_regret
@@ -414,7 +400,8 @@ class LinMAB:
                     )
                 )
             )
-            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t, self.eta)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
 
         return reward, expected_regret
@@ -444,7 +431,8 @@ class LinMAB:
                     )
                 )
             )
-            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t, self.eta)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
 
         return reward, expected_regret
@@ -517,7 +505,8 @@ class LinMAB:
             # Algorithm
             thetas = np.random.multivariate_normal(mu_t, sigma_t, M)
             a_t, p_a = self.computeVIDS(thetas)
-            r_t, mu_t, sigma_t, p_t = self.updatePosterior_(a_t, sigma_t, p_t)
+            f_t, r_t = self.features[a_t], self.reward(a_t)[0]
+            mu_t, sigma_t, p_t = self.updatePosterior_(sigma_t, p_t, f_t, r_t, self.eta)
             reward[t], expected_regret[t] = r_t, self.expect_regret(a_t, self.features)
 
         return reward, expected_regret

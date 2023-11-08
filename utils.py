@@ -165,13 +165,13 @@ def labelColor(methods):
     return labels, colors, markers
 
 
-# @nb.njit
+@nb.njit
 def rankone_update(f, Sigma, eta):
     ffT = np.outer(f, f)
     return Sigma - (Sigma @ ffT @ Sigma) / (eta**2 + f @ Sigma @ f)
 
 
-# @nb.njit
+@nb.njit
 def updatePosterior(sigma, p, f, r, eta):
     """
     Update posterior mean and covariance matrix incrementally
@@ -187,7 +187,7 @@ def updatePosterior(sigma, p, f, r, eta):
     return mu_, sigma_, p_
 
 
-# @nb.njit
+@nb.njit
 def update_inv_sigma(inv_sigma, f, eta):
     ffT = np.outer(f, f)
     return inv_sigma + (1 / eta**2) * ffT

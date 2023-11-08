@@ -67,22 +67,22 @@ param = {
 }
 
 # done
-index_done = []
-noise_done = []
+# index_done = []
+# noise_done = []
 
-# index_done = [
-#     "Normal",
-#     "PMCoord",
-#     "Sphere",
-#     "UnifCube",
-# ]
+index_done = [
+    "Normal",
+    "PMCoord",
+    "Sphere",
+    "UnifCube",
+]
 
-# noise_done = [
-#     "Gaussian",
-#     "Sphere",
-#     "PMCoord",
-#     "UnifCube",
-# ]
+noise_done = [
+    "Gaussian",
+    "Sphere",
+    "PMCoord",
+    "UnifCube",
+]
 
 # all
 
@@ -120,7 +120,7 @@ for index in index_candidates:
         index_noise_candidates.append("IS:{}_{}".format(index, noise))
 
 methods = [
-    "TS",
+    # "TS",
     ## "ES",
     # "IS:Haar",
     # "LinUCB",

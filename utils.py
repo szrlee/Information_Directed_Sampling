@@ -168,6 +168,7 @@ def labelColor(methods):
 @nb.njit
 def rankone_update(f, Sigma, eta):
     ffT = np.outer(f, f)
+    # print(type(eta))
     return Sigma - (Sigma @ ffT @ Sigma) / (eta**2 + f @ Sigma @ f)
 
 
@@ -213,7 +214,7 @@ def haar_matrix(M):
     Haar random matrix generation
     """
     # z = np.random.randn(M, M)
-    z = rng.standard_normal((M, M), dtype=np.float32)
+    z = rng.standard_normal((M, M), dtype=np.float64)
     q, r = np.linalg.qr(z)
     d = np.diag(r)
     ph = d / np.abs(d)
@@ -223,7 +224,7 @@ def haar_matrix(M):
 # @nb.njit
 def sphere_matrix(N, M):
     # v = np.random.randn(N, M)
-    v = rng.standard_normal((N, M), dtype=np.float32)
+    v = rng.standard_normal((N, M), dtype=np.float64)
     v /= np.linalg.norm(v, axis=1, keepdims=True)
     return v
 
@@ -255,29 +256,29 @@ def sample_noise(noise_type, M, dim=1, sparsity=2):
     if noise_type == "Sphere":
         return sphere_matrix(dim, M)
     elif noise_type == "Gaussian" or noise_type == "Normal":
-        return rng.standard_normal((dim, M), dtype=np.float32) / np.sqrt(M)
+        return rng.standard_normal((dim, M), dtype=np.float64) / np.sqrt(M)
     elif noise_type == "PMCoord":
         i = rng.choice(M, dim)
-        B = np.zeros((dim, M), dtype=np.float32)
+        B = np.zeros((dim, M), dtype=np.float64)
         B[np.arange(dim), i] = random_sign(dim)
         return B
     elif noise_type == "Sparse":
         i = random_choice_noreplace(dim, M)[:, :sparsity]
-        B = np.zeros((dim, M), dtype=np.float32)
+        B = np.zeros((dim, M), dtype=np.float64)
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(
             dim * sparsity
         ).reshape(dim, sparsity) / np.sqrt(sparsity)
         return B
     elif noise_type == "SparseConsistent":
         i = random_choice_noreplace(dim, M)[:, :sparsity]
-        B = np.zeros((dim, M), dtype=np.float32)
+        B = np.zeros((dim, M), dtype=np.float64)
         B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(dim).reshape(
             dim, 1
         ) / np.sqrt(sparsity)
         return B
     elif noise_type == "UnifCube":
         return (
-            2 * rng.binomial(1, 0.5, (dim, M)).astype(dtype=np.float32) - 1
+            2 * rng.binomial(1, 0.5, (dim, M)).astype(dtype=np.float64) - 1
         ) / np.sqrt(M)
     else:
         raise NotImplementedError
@@ -568,8 +569,8 @@ def approx_err(a, action_set, P, Q, Q_inv):
     low_norm_err = 1 - np.linalg.norm(Q_inv @ P, -2)  # eps_2 = (1- (1-eps_2))
     # norm_err = max(up_norm_err, low_norm_err)
     # t = time.time()
-    xPx = np.zeros(len(action_set), dtype=np.float32)
-    xQx = np.zeros(len(action_set), dtype=np.float32)
+    xPx = np.zeros(len(action_set), dtype=np.float64)
+    xQx = np.zeros(len(action_set), dtype=np.float64)
     for i in range(len(action_set)):
         xPx[i] = np.dot(action_set[i], np.dot(P, action_set[i]))
         xQx[i] = np.dot(action_set[i], np.dot(Q, action_set[i]))

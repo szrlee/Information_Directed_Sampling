@@ -129,7 +129,7 @@ class LinMAB:
         dic = self.data_init(T, self.data_groups)
 
         # Algorithm
-        mu_t, sigma_t = self.initPrior()
+        mu_t, sigma_t = self.initPrior(dtype=np.float64)
         inv_sigma_t = np.linalg.inv(sigma_t)
         p_t = inv_sigma_t @ mu_t
         for t in range(T):
@@ -201,10 +201,10 @@ class LinMAB:
                 raise NotImplementedError
 
         # Algorithm initialization
-        mu_t, Sigma_t = self.initPrior(dtype=np.float32)
+        mu_t, Sigma_t = self.initPrior(dtype=np.float64)
         S_inv = np.linalg.inv(Sigma_t)
         p_t = S_inv @ mu_t
-        sqrt_Sigma_t = sqrtm(Sigma_t).astype(np.float32)
+        sqrt_Sigma_t = sqrtm(Sigma_t)
 
         # Initialization for factor A: Sample matrix B with size d x M
         B = sample_noise(perturbed_noise, M, self.d)
@@ -290,9 +290,7 @@ class LinMAB:
         """
         Ensemble sampling
         """
-        reward, expected_regret = np.zeros(T, dtype=np.float32), np.zeros(
-            T, dtype=np.float32
-        )
+        reward, expected_regret = np.zeros(T), np.zeros(T)
         mu_t, Sigma_t = self.initPrior()
         # A_t = np.zeros((self.d, M))
         # P_t = np.zeros((self.d, M))

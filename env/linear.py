@@ -81,17 +81,17 @@ class ChangingLinModel(ArmGaussianLinear):
         )
         self.u = u
         self.eta = eta
-        self.features = np.zeros((n_actions, n_features), dtype=np.float32)
+        self.features = np.zeros((n_actions, n_features), dtype=np.float64)
         self.real_theta = self.prior_random.multivariate_normal(
-            np.zeros(n_features, dtype=np.float32),
-            sigma * np.eye(n_features, dtype=np.float32),
+            np.zeros(n_features, dtype=np.float64),
+            sigma * np.eye(n_features, dtype=np.float64),
         )
         self.alg_prior_sigma = sigma
         self.t = 0
 
     def set_context(self):
         x = self.prior_random.standard_normal(
-            (self.n_actions, self.n_features), dtype=np.float32
+            (self.n_actions, self.n_features), dtype=np.float64
         )
         x /= np.linalg.norm(x, axis=1, keepdims=True)
         self.features = x
@@ -116,17 +116,17 @@ class FreqChangingLinModel(ArmGaussianLinear):
         )
         self.u = u
         self.eta = eta
-        self.features = np.zeros((n_actions, n_features), dtype=np.float32)
+        self.features = np.zeros((n_actions, n_features), dtype=np.float64)
         self.real_theta = self.prior_random.multivariate_normal(
-            np.zeros(n_features, dtype=np.float32),
-            sigma * np.eye(n_features, dtype=np.float32),
+            np.zeros(n_features, dtype=np.float64),
+            sigma * np.eye(n_features, dtype=np.float64),
         )
         self.alg_prior_sigma = sigma
         self.t = 0
 
     def set_context(self):
         x = self.prior_random.standard_normal(
-            (self.n_actions, self.n_features), dtype=np.float32
+            (self.n_actions, self.n_features), dtype=np.float64
         )
         x /= np.linalg.norm(x, axis=1, keepdims=True)
         self.features = x

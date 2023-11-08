@@ -120,7 +120,7 @@ for index in index_candidates:
         index_noise_candidates.append("IS:{}_{}".format(index, noise))
 
 methods = [
-    # "TS",
+    "TS",
     ## "ES",
     # "IS:Haar",
     # "LinUCB",

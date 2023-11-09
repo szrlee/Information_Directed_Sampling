@@ -67,22 +67,22 @@ param = {
 }
 
 # done
-# index_done = []
-# noise_done = []
+index_done = []
+noise_done = []
 
-index_done = [
-    "Normal",
-    "PMCoord",
-    "Sphere",
-    "UnifCube",
-]
+# index_done = [
+#     "Normal",
+#     "PMCoord",
+#     "Sphere",
+#     "UnifCube",
+# ]
 
-noise_done = [
-    "Gaussian",
-    "Sphere",
-    "PMCoord",
-    "UnifCube",
-]
+# noise_done = [
+#     "Gaussian",
+#     "Sphere",
+#     "PMCoord",
+#     "UnifCube",
+# ]
 
 # all
 

@@ -1,11 +1,15 @@
 import numpy as np
 from utils import rd_argmax
+import time
+import jax.numpy as jnp
+from jax import random as jrd
 
 
 class ArmGaussianLinear(object):
     def __init__(self, prior_random_seed=2022, reward_random_seed=2023):
         self.prior_random = np.random.default_rng(seed=prior_random_seed)
         self.reward_random = np.random.default_rng(seed=reward_random_seed)
+        self.prior_key = jrd.PRNGKey(prior_random_seed)
 
     def reward(self, arm):
         """
@@ -87,14 +91,33 @@ class ChangingLinModel(ArmGaussianLinear):
             sigma * np.eye(n_features, dtype=np.float64),
         )
         self.alg_prior_sigma = sigma
+        # for changing action seet
         self.t = 0
+        self.n_steps = 10
+        # self.x = jnp.zeros((self.n_steps * n_actions, n_features))
+
+    def set_features(self, n_steps, rng, n_actions, n_features):
+        # start_time = time.time()
+        # self.x[:] = rng.standard_normal((n_steps * n_actions, n_features))
+        self.prior_key, subkey = jrd.split(self.prior_key)
+        self.x = jrd.normal(subkey, (n_steps * n_actions, n_features))
+        # end_time = time.time()
+        # print("time for generating features: ", end_time - start_time)
+        # start_time = time.time()
+        self.x /= jnp.linalg.norm(self.x, axis=1, keepdims=True)
+        # end_time = time.time()
+        # print("time for normalizing features: ", end_time - start_time)
 
     def set_context(self):
-        x = self.prior_random.standard_normal(
-            (self.n_actions, self.n_features), dtype=np.float64
-        )
-        x /= np.linalg.norm(x, axis=1, keepdims=True)
-        self.features = x
+        if self.t % self.n_steps == 0:
+            self.set_features(
+                self.n_steps, self.prior_random, self.n_actions, self.n_features
+            )
+        self.features[:] = self.x[
+            self.t * self.n_actions : (self.t + 1) * self.n_actions
+        ]
+        # print(self.features.shape)
+        self.t = (self.t + 1) % self.n_steps
 
 
 class FreqChangingLinModel(ArmGaussianLinear):

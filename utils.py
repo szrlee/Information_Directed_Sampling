@@ -277,9 +277,7 @@ def sample_noise(noise_type, M, dim=1, sparsity=2):
         ) / np.sqrt(sparsity)
         return B
     elif noise_type == "UnifCube":
-        return (
-            2 * rng.binomial(1, 0.5, (dim, M)).astype(dtype=np.float64) - 1
-        ) / np.sqrt(M)
+        return (2 * rng.binomial(1, 0.5, (dim, M)) - 1) / np.sqrt(M)
     else:
         raise NotImplementedError
 

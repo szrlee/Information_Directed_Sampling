@@ -3,6 +3,7 @@ from agent.BernoulliMAB import BetaBernoulliMAB
 from agent.GaussianMAB import GaussianMAB
 from agent.FiniteSetsMAB import FiniteSets
 from agent.closedform import LinMAB
+from agent.CompactClosedform import LinCompact
 from agent.MAB import GenericMAB
 from env.linear import (
     FGTSLinModel,
@@ -11,6 +12,8 @@ from env.linear import (
     ColdStartMovieLensModel,
     ChangingLinModel,
     FreqChangingLinModel,
+    CompactLinModel,
+    FreqCompactLinModel,
 )
 from env.finitecontext import (
     FiniteContextFGTSLinModel,
@@ -206,6 +209,61 @@ def LinMAB_expe(
         plotRegret(labels, results, colors, title, path, log=log, markers=markers)
     # if track_ids:
     #     plot_IDS_results(T, n_expe, results["IDS_results"])
+    return results
+
+
+def LinCompact_expe(
+    n_expe,
+    n_features,
+    T,
+    methods,
+    param_dic,
+    labels,
+    colors,
+    markers,
+    path,
+    problem="CompactLinear",
+    doplot=True,
+    # track_ids=False,
+):
+    """
+    Compute regrets for a given set of algorithms (methods) over t=1,...,T and for n_expe number of independent
+    experiments. Here we deal with n_arms Linear Gaussian Bandits with multivariate Gaussian prior
+    :param n_expe: int, number of experiments
+    :param n_features: int, dimension of feature vectors
+    :param n_arms: int, number of arms
+    :param T: int, time horizon
+    :param methods: list, algorithms to use
+    :param param_dic: dict, parameters associated to each algorithm (see main for formatting)
+    :param labels: list, labels for the curves
+    :param colors: list, colors for the curves
+    :param doplot: boolean, plot the curves or not
+    :param problem: str, choose from {'FreqRusso', 'Zhang', 'Russo', 'movieLens'}
+    :param path: str
+    :return: dict, regrets, quantiles, means, stds of final regrets for each methods
+    """
+    if problem == "CompactLinear":
+        models = [
+            LinCompact(CompactLinModel(n_features, sigma=10)) for _ in range(n_expe)
+        ]
+        log = False
+        title = "Linear Gaussian Model with Compact Action Set (Bayes MOD) - n_features: {}".format(
+            n_features
+        )
+    elif problem == "FreqCompactLinear":
+        models = [
+            LinCompact(FreqCompactLinModel(n_features, sigma=10)) for _ in range(n_expe)
+        ]
+        log = False
+        title = "Linear Gaussian Model with Compact Action Set (Freq MOD) - n_features: {}".format(
+            n_features
+        )
+    else:
+        raise NotImplementedError
+    print("Begin experiments on '{}'".format(title))
+    results = storeRegret(models, methods, param_dic, n_expe, T, path)
+    if doplot:
+        plotRegret(labels, results, colors, title, path, log=log, markers=markers)
     return results
 
 

@@ -13,7 +13,7 @@ import inspect
 import pickle as pkl
 import time
 
-rng = None
+rng = np.random.default_rng(0)
 
 cmap = {
     0: "black",
@@ -250,36 +250,100 @@ def random_sign(N=None):
         return rng.integers(2, size=N) * 2 - 1
 
 
-def sample_noise(noise_type, M, dim=1, sparsity=2):
+def sample_noise(noise_type, M, n_samples=1, sparsity=2):
+    """
+    Sample noise vectors
+    :param noise_type: string, type of noise
+    :param M: int, dimension of noise vectors
+    :param n_samples: int, number of samples
+    :param sparsity: int, sparsity of the noise vectors
+    :return: np.array, shape (n_samples, M), sampled noise vectors
+    """
     # ensure the sampled vector is isotropic
     assert M > 0
     if noise_type == "Sphere":
-        return sphere_matrix(dim, M)
+        return sphere_matrix(n_samples, M)
     elif noise_type == "Gaussian" or noise_type == "Normal":
-        return rng.standard_normal((dim, M), dtype=np.float64) / np.sqrt(M)
+        return rng.standard_normal((n_samples, M), dtype=np.float64) / np.sqrt(M)
     elif noise_type == "PMCoord":
-        i = rng.choice(M, dim)
-        B = np.zeros((dim, M), dtype=np.float64)
-        B[np.arange(dim), i] = random_sign(dim)
+        i = rng.choice(M, n_samples)
+        B = np.zeros((n_samples, M), dtype=np.float64)
+        B[np.arange(n_samples), i] = random_sign(n_samples)
         return B
     elif noise_type == "Sparse":
-        i = random_choice_noreplace(dim, M)[:, :sparsity]
-        B = np.zeros((dim, M), dtype=np.float64)
-        B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(
-            dim * sparsity
-        ).reshape(dim, sparsity) / np.sqrt(sparsity)
+        i = random_choice_noreplace(n_samples, M)[:, :sparsity]
+        B = np.zeros((n_samples, M), dtype=np.float64)
+        B[np.expand_dims(np.arange(n_samples), axis=1), i] = random_sign(
+            n_samples * sparsity
+        ).reshape(n_samples, sparsity) / np.sqrt(sparsity)
         return B
     elif noise_type == "SparseConsistent":
-        i = random_choice_noreplace(dim, M)[:, :sparsity]
-        B = np.zeros((dim, M), dtype=np.float64)
-        B[np.expand_dims(np.arange(dim), axis=1), i] = random_sign(dim).reshape(
-            dim, 1
-        ) / np.sqrt(sparsity)
+        i = random_choice_noreplace(n_samples, M)[:, :sparsity]
+        B = np.zeros((n_samples, M), dtype=np.float64)
+        B[np.expand_dims(np.arange(n_samples), axis=1), i] = random_sign(
+            n_samples
+        ).reshape(n_samples, 1) / np.sqrt(sparsity)
         return B
     elif noise_type == "UnifCube":
-        return (2 * rng.binomial(1, 0.5, (dim, M)) - 1) / np.sqrt(M)
+        return (2 * rng.binomial(1, 0.5, (n_samples, M)) - 1) / np.sqrt(M)
     else:
         raise NotImplementedError
+
+
+def init_prior(a0, s0, d, dtype=np.float64):
+    """
+    :param a0: float, prior mean
+    :param s0: float, prior variance
+    :param d: int, dimension of the parameter
+    :param dtype: type, type of the parameter
+    :return: np.array, shape (d, ), prior mean
+    :return: np.array, shape (d, d), prior covariance matrix
+    """
+    mu_0 = a0 * np.ones(d, dtype=dtype)
+    sigma_0 = s0 * np.eye(d, dtype=dtype)
+    return mu_0, sigma_0
+
+
+def index_sampling(A, mu, index, n_samples=1):
+    """
+    :param A: np.array, covariance factor
+    :param mu: np.array, mean of the posterior distribution
+    :param index: str, index sampling scheme
+    :param scheme: str, approximate posterior sampling scheme
+    :return: np.array, shape (d, n_samples), samples from the approximate posterior distribution
+    """
+    assert mu.shape[0] == A.shape[0]
+    assert len(mu.shape) == 1
+    M = A.shape[1]
+    z = sample_noise(index, M, n_samples).T * np.sqrt(M)
+    img_theta = A @ z + mu.reshape(-1, 1)
+    return img_theta
+
+
+def posterior_sampling(mu, sigma, n_samples=1):
+    """
+    :param mu: np.array, mean of the posterior distribution
+    :param sigma: np.array, covariance matrix of the posterior distribution
+    :param n_samples: int, number of samples to draw from the posterior distribution
+    :return: np.array, shape (d, n_samples), samples from the posterior distribution
+    """
+    assert mu.shape[0] == sigma.shape[0] == sigma.shape[1]
+    assert len(mu.shape) == 1
+    # assert not np.isnan(sigma).any()
+    # assert not np.isinf(sigma).any()
+    d = mu.shape[0]
+    try:
+        theta = rng.multivariate_normal(mu, sigma, n_samples).T
+    except:
+        try:
+            z = sample_noise("Normal", d, n_samples).T * np.sqrt(d)
+            theta = sqrtm(sigma) @ z + mu.reshape(-1, 1)
+        except:
+            print(np.isnan(sigma).any(), np.isinf(sigma).any())
+    # assert theta.shape == (d, n_samples)
+    # assert not np.isnan(theta).any()
+    # assert not np.isinf(theta).any()
+    return theta
 
 
 def multi_haar_matrix(N, M):
@@ -560,27 +624,21 @@ def set_seed(seed, use_torch=False):
 
 
 @nb.njit
-def approx_err(a, action_set, P, Q, Q_inv):
-    # Compute the approximation error of P. Q is the matrix to be approximated.
-    # Q_inv = np.linalg.inv(Q)
-    up_norm_err = np.linalg.norm(Q_inv @ P, 2) - 1  # eps_1 = (1+ eps_1 -1)
-    low_norm_err = 1 - np.linalg.norm(Q_inv @ P, -2)  # eps_2 = (1- (1-eps_2))
-    # norm_err = max(up_norm_err, low_norm_err)
-    # t = time.time()
+def approx_err(action_set, P, Q):
     xPx = np.zeros(len(action_set), dtype=np.float64)
     xQx = np.zeros(len(action_set), dtype=np.float64)
     for i in range(len(action_set)):
         xPx[i] = np.dot(action_set[i], np.dot(P, action_set[i]))
         xQx[i] = np.dot(action_set[i], np.dot(Q, action_set[i]))
-    # xPx = np.zeros(len(action_set))
-    # print(np.round_(time.time() - t, 3), "sec elapsed")
-    # t = time.time()
-    # xPxt = np.diag(action_set @ P @ action_set.T)
-    # print(np.round_(time.time() - t, 3), "sec elapsed")
-    # print(np.allclose(xPx, xPxt))
-    # xQx = np.einsum("ij,jk,ki->i", action_set, Q, action_set.T)
-    # xQx = np.zeros(len(action_set))
-    # pot = xQx[a]
-    # approx_pot = xPx[a]
 
-    return up_norm_err, low_norm_err, (xPx - xQx) / xQx, xQx[a], xPx[a]
+    return (xPx - xQx) / xQx
+
+
+@nb.njit
+def approx_err_compact(P, Q_inv):
+    # Compute the approximation error of P. Q is the matrix to be approximated.
+    # Q_inv = np.linalg.inv(Q)
+    up_norm_err = np.linalg.norm(Q_inv @ P, 2) - 1  # eps_1 = (1+ eps_1 -1)
+    low_norm_err = 1 - np.linalg.norm(Q_inv @ P, -2)  # eps_2 = (1- (1-eps_2))
+
+    return up_norm_err, low_norm_err

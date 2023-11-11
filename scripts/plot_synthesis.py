@@ -32,6 +32,7 @@ GMAE_NAMES = {
     "Gaussian": "Gaussian",
     "synthetic-v1": "Synthetic h1",
     "synthetic-v2": "Synthetic h2",
+    "CompactLinear": "CompactLinear",
 }
 
 # %%
@@ -55,10 +56,10 @@ path = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 path
 
 # %%
-game_name = "ChangingRusso"
+game_name = "CompactLinear"
 
 # %%
-time_tag = "20231108"
+time_tag = "20231109"
 
 # %%
 load_path = f"{path}/results/bandit/{game_name}/{time_tag}"
@@ -90,6 +91,11 @@ for root, dirs, files in os.walk(load_path):
                 )
         if game_name in ["Bernoulli", "Gaussian"]:
             title = f"{GMAE_NAMES[game_name]} \n n_arms: {user_config['n_arms']}"
+        elif game_name in ["CompactLinear"]:
+            game_config = config["game_config"]
+            title = (
+                f"{GMAE_NAMES[game_name]} \n n_features: {game_config['n_features']}"
+            )
         else:
             game_config = config["game_config"]
             title = f"{GMAE_NAMES[game_name]} \n n_arms: {game_config['n_arms']} - n_features: {game_config['n_features']}"

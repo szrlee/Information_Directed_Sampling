@@ -5,6 +5,103 @@ import jax.numpy as jnp
 from jax import random as jrd
 
 
+class CompactGaussianLinear(object):
+    # Gaussian Linear bandit with compact action set (i.e. action set is the unit ball in R^d)
+    def __init__(self, prior_random_seed=2022, reward_random_seed=2023):
+        self.prior_random = np.random.default_rng(seed=prior_random_seed)
+        self.reward_random = np.random.default_rng(seed=reward_random_seed)
+        self.prior_key = jrd.PRNGKey(prior_random_seed)
+
+    @property
+    def real_theta(self):
+        return self._real_theta
+
+    @real_theta.setter
+    def real_theta(self, value):
+        self._real_theta = value
+        self._optimal_action = self._real_theta / np.linalg.norm(self._real_theta)
+        self._best_arm_reward = np.dot(self._optimal_action, self._real_theta)
+
+    @property
+    def optimal_action(self):
+        return self._optimal_action
+
+    @property
+    def best_arm_reward(self):
+        return self._best_arm_reward
+
+    def reward(self, arm):
+        """
+        Pull 'arm' and get the reward drawn from a^T . theta + epsilon with epsilon following N(0, eta)
+        :param arm: int
+        :return: float
+        """
+        return np.dot(arm, self.real_theta) + self.reward_random.normal(0, self.eta, 1)
+
+    def set_context(self):
+        pass
+
+    def expect_regret(self, arm):
+        """
+        Compute the regret of a single step
+        """
+        expect_reward = np.dot(arm, self.real_theta)
+        # best_arm_reward = np.dot(self.optimal_action, self.real_theta)
+        return self.best_arm_reward - expect_reward
+
+    def pessimism_regret(self, arm, img_theta, scheme):
+        """
+        Compute the pessimism regret of a single step
+        """
+        if scheme == "ts":
+            img_reward = np.dot(arm, img_theta)
+        elif scheme == "ots":
+            img_reward = np.max(np.dot(arm, img_theta))
+
+        return self.best_arm_reward - img_reward
+
+
+class CompactLinModel(CompactGaussianLinear):
+    def __init__(self, n_features=100, eta=1, sigma=10):
+        """
+        Initialization of Linear Gaussian bandit with compact action set (i.e. action set is the unit ball in R^d)
+        :param n_features: int, dimension of the feature vectors
+        :param eta: float, std from the reward likelihood model N(a^T.theta, eta)
+        """
+        super(CompactLinModel, self).__init__(
+            prior_random_seed=np.random.randint(1, 312414),
+            reward_random_seed=np.random.randint(1, 312414),
+        )
+        self.eta = eta
+        self.alg_prior_sigma = sigma
+        self.n_features = n_features
+        self.real_theta = self.prior_random.multivariate_normal(
+            np.zeros(n_features),
+            sigma * np.eye(n_features),
+        )
+
+
+# Creat a frequentist version of CompactLinModel
+class FreqCompactLinModel(CompactGaussianLinear):
+    def __init__(self, n_features=100, eta=1, sigma=10):
+        """
+        (Frequentist version) Initialization of Linear Gaussian bandit with compact action set (i.e. action set is the unit ball in R^d)
+        :param n_features: int, dimension of the feature vectors
+        :param eta: float, std from the reward likelihood model N(a^T.theta, eta)
+        """
+        super(FreqCompactLinModel, self).__init__(
+            prior_random_seed=2022,
+            reward_random_seed=np.random.randint(1, 312414),
+        )
+        self.eta = eta
+        self.alg_prior_sigma = sigma
+        self.n_features = n_features
+        self.real_theta = self.prior_random.multivariate_normal(
+            np.zeros(n_features),
+            sigma * np.eye(n_features),
+        )
+
+
 class ArmGaussianLinear(object):
     def __init__(self, prior_random_seed=2022, reward_random_seed=2023):
         self.prior_random = np.random.default_rng(seed=prior_random_seed)
@@ -93,31 +190,23 @@ class ChangingLinModel(ArmGaussianLinear):
         self.alg_prior_sigma = sigma
         # for changing action seet
         self.t = 0
-        self.n_steps = 10
+        self.n_buffer = 10
         # self.x = jnp.zeros((self.n_steps * n_actions, n_features))
 
-    def set_features(self, n_steps, rng, n_actions, n_features):
-        # start_time = time.time()
+    def set_features(self, n_buffer, n_actions, n_features):
         # self.x[:] = rng.standard_normal((n_steps * n_actions, n_features))
+        # self.x /= np.linalg.norm(self.x, axis=1, keepdims=True)
         self.prior_key, subkey = jrd.split(self.prior_key)
-        self.x = jrd.normal(subkey, (n_steps * n_actions, n_features))
-        # end_time = time.time()
-        # print("time for generating features: ", end_time - start_time)
-        # start_time = time.time()
+        self.x = jrd.normal(subkey, (n_buffer * n_actions, n_features))
         self.x /= jnp.linalg.norm(self.x, axis=1, keepdims=True)
-        # end_time = time.time()
-        # print("time for normalizing features: ", end_time - start_time)
 
     def set_context(self):
-        if self.t % self.n_steps == 0:
-            self.set_features(
-                self.n_steps, self.prior_random, self.n_actions, self.n_features
-            )
+        if self.t % self.n_buffer == 0:
+            self.set_features(self.n_buffer, self.n_actions, self.n_features)
         self.features[:] = self.x[
             self.t * self.n_actions : (self.t + 1) * self.n_actions
         ]
-        # print(self.features.shape)
-        self.t = (self.t + 1) % self.n_steps
+        self.t = (self.t + 1) % self.n_buffer
 
 
 class FreqChangingLinModel(ArmGaussianLinear):
@@ -145,14 +234,25 @@ class FreqChangingLinModel(ArmGaussianLinear):
             sigma * np.eye(n_features, dtype=np.float64),
         )
         self.alg_prior_sigma = sigma
+        # for changing action seet
         self.t = 0
+        self.n_buffer = 10
+        # self.x = jnp.zeros((self.n_steps * n_actions, n_features))
+
+    def set_features(self, n_buffer, n_actions, n_features):
+        # self.x[:] = rng.standard_normal((n_steps * n_actions, n_features))
+        # self.x /= np.linalg.norm(self.x, axis=1, keepdims=True)
+        self.prior_key, subkey = jrd.split(self.prior_key)
+        self.x = jrd.normal(subkey, (n_buffer * n_actions, n_features))
+        self.x /= jnp.linalg.norm(self.x, axis=1, keepdims=True)
 
     def set_context(self):
-        x = self.prior_random.standard_normal(
-            (self.n_actions, self.n_features), dtype=np.float64
-        )
-        x /= np.linalg.norm(x, axis=1, keepdims=True)
-        self.features = x
+        if self.t % self.n_buffer == 0:
+            self.set_features(self.n_buffer, self.n_actions, self.n_features)
+        self.features[:] = self.x[
+            self.t * self.n_actions : (self.t + 1) * self.n_actions
+        ]
+        self.t = (self.t + 1) % self.n_buffer
 
 
 class PaperLinModel(ArmGaussianLinear):

@@ -4,9 +4,12 @@ from utils import (
     rd_argmax,
     sample_noise,
     approx_err,
+    approx_err_compact,
     rankone_update,
     update_inv_sigma,
     updatePosterior,
+    index_sampling,
+    posterior_sampling,
 )
 from scipy.stats import norm
 from scipy.linalg import sqrtm
@@ -115,17 +118,6 @@ class LinMAB:
         :return: np.arrays, reward obtained by the policy and sequence of chosen arms
         """
 
-        def posterior_sampling(mu, sigma, n_samples=1):
-            try:
-                theta = np.random.multivariate_normal(mu, sigma, n_samples).T
-            except:
-                try:
-                    z = np.random.normal(0, 1, size=(self.d, n_samples))
-                    theta = sqrtm(sigma) @ z + np.expand_dims(mu, axis=1)
-                except:
-                    print(np.isnan(sigma).any(), np.isinf(sigma).any())
-            return theta
-
         dic = self.data_init(T, self.data_groups)
 
         # Algorithm
@@ -187,19 +179,6 @@ class LinMAB:
 
         dic = self.data_init(T, {**self.data_groups, **self.data_groups_IS})
 
-        def index_sampling(A, mu, index, scheme="ts"):
-            M = A.shape[1]
-            if scheme == "ts":
-                z = sample_noise(index, M)[0] * np.sqrt(M)
-                img_theta = A @ z + mu
-                return np.dot(self.features, img_theta)
-            elif scheme == "ots":
-                z = sample_noise(index, M, 10).T * np.sqrt(M)
-                img_theta = A @ z + np.expand_dims(mu, axis=1)
-                return np.max(np.dot(self.features, img_theta), axis=1)
-            else:
-                raise NotImplementedError
-
         # Algorithm initialization
         mu_t, Sigma_t = self.initPrior(dtype=np.float64)
         S_inv = np.linalg.inv(Sigma_t)
@@ -220,7 +199,12 @@ class LinMAB:
             # Changing action set (If env applicable)
             self.set_context()
             # index sampling
-            img_reward = index_sampling(A_t, mu_t, index, scheme=scheme)
+            if scheme == "ts":
+                img_theta = index_sampling(A_t, mu_t, index)
+                img_reward = np.dot(self.features, img_theta)
+            elif scheme == "ots":
+                img_theta = index_sampling(A_t, mu_t, index, 10)
+                img_reward = np.max(np.dot(self.features, img_theta), axis=1)
             # action selection
             a_t = rd_argmax(img_reward)
             # selected feature and reward feedback
@@ -230,7 +214,7 @@ class LinMAB:
                 a_t, self.features
             )
 
-            #
+            # Synthesis: lmax, lmin, pess_regret, est_regret, potential: pot; lmax_inv, lmin_inv, kappa_inv
             P = A_t @ A_t.T
             dic["approx_potential"][t] = f_t.T @ P @ f_t
             dic["potential"][t] = f_t.T @ Sigma_t @ f_t
@@ -239,13 +223,11 @@ class LinMAB:
             if t % self.data_groups["lmax"] == 0:
                 # Synthesis only for index sampling (not every step)
                 a_star = self.optimal_action(self.features)
-                (
-                    dic["up_norm_err"][t],
-                    dic["low_norm_err"][t],
-                    all_err,
-                    _,
-                    _,
-                ) = approx_err(a_t, self.features, P, Sigma_t, S_inv)
+                #
+                dic["up_norm_err"][t], dic["low_norm_err"][t] = approx_err_compact(
+                    P, S_inv
+                )
+                all_err = approx_err(self.features, P, Sigma_t)
                 dic["a_t_err"][t] = all_err[a_t]
                 dic["a_star_err"][t] = all_err[a_star]
                 dic["up_set_err"][t] = np.max((all_err))
@@ -254,10 +236,9 @@ class LinMAB:
                 (
                     dic["tilde_up_norm_err"][t],
                     dic["tilde_low_norm_err"][t],
-                    tilde_all_err,
-                    _,
-                    _,
-                ) = approx_err(a_t, self.features, tilde_P, Sigma_t, S_inv)
+                ) = approx_err_compact(tilde_P, S_inv)
+                # tilde
+                tilde_all_err = approx_err(self.features, tilde_P, Sigma_t)
                 dic["tilde_a_t_err"][t] = tilde_all_err[a_t]
                 dic["tilde_a_star_err"][t] = tilde_all_err[a_star]
                 dic["tilde_up_set_err"][t] = np.max((tilde_all_err))

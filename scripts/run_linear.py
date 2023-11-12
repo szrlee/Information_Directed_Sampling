@@ -89,7 +89,7 @@ noise_done = []
 index_candidates = [
     "Normal",
     "Sparse",
-    "SparseConsistent",
+    # "SparseConsistent",
     "PMCoord",
     "Sphere",
     "UnifCube",
@@ -101,7 +101,7 @@ noise_candidates = [
     "PMCoord",
     "UnifCube",
     "Sparse",
-    "SparseConsistent",
+    # "SparseConsistent",
 ]
 
 index_noise_candidates = []

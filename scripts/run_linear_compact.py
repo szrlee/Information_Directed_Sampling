@@ -106,7 +106,7 @@ for index in index_candidates:
         index_noise_candidates.append("IS:{}_{}".format(index, noise))
 
 methods = [
-    # "TS",
+    "TS",
 ]
 
 methods.extend(index_noise_candidates)

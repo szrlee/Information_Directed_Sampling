@@ -59,7 +59,7 @@ path
 game_name = "CompactLinear"
 
 # %%
-time_tag = "20231109"
+time_tag = "20231113"
 
 # %%
 load_path = f"{path}/results/bandit/{game_name}/{time_tag}"

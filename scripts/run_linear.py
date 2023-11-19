@@ -52,7 +52,12 @@ args = get_args()
 game = args.game
 now = datetime.now()
 dir = f"{game.lower()}_{time.strftime('%Y%m%d%H%M%S', time.localtime())}"
-path = os.path.expanduser(os.path.join(args.logdir, game, dir))
+if game == "movieLens":
+    args.d_theta = 30
+    args.n_arms = 207
+path = os.path.expanduser(
+    os.path.join(args.logdir, game, str(args.d_theta), str(args.n_arms), dir)
+)
 os.makedirs(path, exist_ok=True)
 
 

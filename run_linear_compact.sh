@@ -1,5 +1,5 @@
 d_index=$1 # 2^1 to 2^10
-d_theta=10 # 10 50
+d_theta=100 # 10 50
 n_expe=200 # {200, 1000}
 # scheme="ts"
 

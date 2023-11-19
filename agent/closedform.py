@@ -93,23 +93,12 @@ class LinMAB:
         )  # to adapt according to the true distribution of theta
         return mu_0, sigma_0
 
-    # def updatePosterior(self, a, mu, sigma):
-    #     """
-    #     Update posterior mean and covariance matrix
-    #     :param arm: int, arm chose
-    #     :param mu: np.array, posterior mean vector
-    #     :param sigma: np.array, posterior covariance matrix
-    #     :return: float and np.arrays, reward obtained with arm a, updated means and covariance matrix
-    #     """
-    #     f, r = self.features[a], self.reward(a)[0]
-    #     s_inv = np.linalg.inv(sigma)
-    #     ffT = np.outer(f, f)
-    #     mu_ = np.dot(
-    #         np.linalg.inv(s_inv + ffT / self.eta**2),
-    #         np.dot(s_inv, mu) + r * f / self.eta**2,
-    #     )
-    #     sigma_ = np.linalg.inv(s_inv + ffT / self.eta**2)
-    #     return r, mu_, sigma_
+    def action_selection(self, img_theta, scheme="ts"):
+        img_reward = np.max(np.dot(self.features, img_theta), axis=1)
+        if scheme == "cots":
+            img_reward = np.clip(img_reward, a_min=0, a_max=None)
+        action = rd_argmax(img_reward)
+        return action, img_reward
 
     def TS(self, T, scheme="ts"):
         """
@@ -130,14 +119,13 @@ class LinMAB:
             # print("features: {}".format(self.features[:5]))
             # input()
             # scheme for img_reward
-            if scheme == "ts":
+            if scheme == "ts" or scheme == "cots":
                 theta_t = posterior_sampling(mu_t, sigma_t)
-                img_reward = np.dot(self.features, theta_t)
             elif scheme == "ots":
                 theta_t = posterior_sampling(mu_t, sigma_t, 10)
-                img_reward = np.max(np.dot(self.features, theta_t), axis=1)
             # action selection
-            a_t = rd_argmax(img_reward)
+            a_t, img_reward = self.action_selection(theta_t, scheme)
+            # selected feature and reward feedback
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
 
             dic["reward"][t], dic["expected_regret"][t] = r_t, self.expect_regret(
@@ -199,14 +187,12 @@ class LinMAB:
             # Changing action set (If env applicable)
             self.set_context()
             # index sampling
-            if scheme == "ts":
+            if scheme == "ts" or scheme == "cots":
                 img_theta = index_sampling(A_t, mu_t, index)
-                img_reward = np.dot(self.features, img_theta)
             elif scheme == "ots":
                 img_theta = index_sampling(A_t, mu_t, index, 10)
-                img_reward = np.max(np.dot(self.features, img_theta), axis=1)
             # action selection
-            a_t = rd_argmax(img_reward)
+            a_t, img_reward = self.action_selection(img_theta, scheme)
             # selected feature and reward feedback
             f_t, r_t = self.features[a_t], self.reward(a_t)[0]
             # compute regret

@@ -40,7 +40,9 @@ def get_args():
     parser.add_argument("--d-index", type=int, default=10)
     parser.add_argument("--n-arms", type=int, default=30)
     parser.add_argument("--d-theta", type=int, default=10)
-    parser.add_argument("--scheme", type=str, default="ts", choices={"ts", "ots"})
+    parser.add_argument(
+        "--scheme", type=str, default="ts", choices={"ts", "ots", "cots"}
+    )
     parser.add_argument("--logdir", type=str, default="./results/bandit")
     args = parser.parse_known_args()[0]
     return args

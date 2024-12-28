@@ -128,7 +128,7 @@ for index in index_candidates:
 
 methods = [
     "TS",
-    ## "ES",
+    # "ES",
     # "IS:Haar",
     # "LinUCB",
     # "BayesUCB",

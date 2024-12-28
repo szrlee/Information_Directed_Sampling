@@ -261,6 +261,7 @@ def sample_noise(noise_type, M, n_samples=1, sparsity=2):
     """
     # ensure the sampled vector is isotropic
     assert M > 0
+    sparsity = min(M, sparsity) # when M = 1, sparsity = 1
     if noise_type == "Sphere":
         return sphere_matrix(n_samples, M)
     elif noise_type == "Gaussian" or noise_type == "Normal":

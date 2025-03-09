@@ -56,7 +56,7 @@ if game == "movieLens":
     args.d_theta = 30
     args.n_arms = 207
 path = os.path.expanduser(
-    os.path.join(args.logdir, game, str(args.d_theta), str(args.n_arms), dir)
+    os.path.join(args.logdir, game, 'scaling_d', str(args.d_theta), str(args.n_arms), dir)
 )
 os.makedirs(path, exist_ok=True)
 
@@ -65,50 +65,18 @@ param = {
     "TS": {
         "scheme": args.scheme,
     },
-    # "ES": {"M": args.d_index},
-    # "LinUCB": {"lbda": 10e-4, "alpha": 10e-1},
-    # "BayesUCB": {},
-    # "GPUCB": {},
-    # "Tuned_GPUCB": {"c": 0.9},
-    # "VIDS_sample": {"M": 10000},
 }
 
 # done
 index_done = []
 noise_done = []
 
-# index_done = [
-#     "Normal",
-#     "PMCoord",
-#     "Sphere",
-#     "UnifCube",
-# ]
-
-# noise_done = [
-#     "Gaussian",
-#     "Sphere",
-#     "PMCoord",
-#     "UnifCube",
-# ]
-
-# all
-
 index_candidates = [
     "Normal",
-    # "Sparse",
-    # "SparseConsistent",
-    # "PMCoord",
-    # "Sphere",
-    # "UnifCube",
 ]
 
 noise_candidates = [
-    # "Gaussian",
     "Sphere",
-    # "PMCoord",
-    # "UnifCube",
-    # "Sparse",
-    # "SparseConsistent",
 ]
 
 index_noise_candidates = []
@@ -126,18 +94,13 @@ for index in index_candidates:
         }
         index_noise_candidates.append("IS:{}_{}".format(index, noise))
 
-methods = [
-    "TS",
-    # "ES",
-    # "IS:Haar",
-    # "LinUCB",
-    # "BayesUCB",
-    # "GPUCB",
-    # "Tuned_GPUCB",
-    # "VIDS_sample",
-]
 
-methods.extend(index_noise_candidates)
+if args.d_index == 0:
+    methods = ["TS"]
+else:
+    methods = index_noise_candidates
+
+print("methods = {}".format(methods))
 
 game_config = {
     "FreqRusso": {

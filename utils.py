@@ -470,7 +470,11 @@ def storeRegret(models, methods, param_dic, n_expe, T, path, use_torch=False):
             for key in set(all_dic.keys()) & set(cum_list)
         }
 
-        print(cum_dic.keys())
+        # store all results of the final step of cum_dic in a dictionary
+        final_step_results = {
+            key: cum_dic[key][:,-1] for key in set(cum_dic.keys())
+        }
+        pkl.dump(final_step_results, open(os.path.join(path, "data", f"{file_name}_final_step.pkl"), "wb"))
 
         cum_dic = {
             key: {
